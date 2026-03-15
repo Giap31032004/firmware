@@ -1,6 +1,35 @@
 :name: MyOS on LM3S6965
 :description: Kich ban chay MyOS tren chip ARM Cortex-M3
 
+# 1. Tạo máy ảo và nạp cấu hình phần cứng
+mach create "lm3s6965_board"
+machine LoadPlatformDescription $ORIGIN/lm3s6965.repl
+
+# 2. [LÀM SẠCH LOG] Gọi đích danh sysbus, ép chỉ in lỗi mức 3 (Error)
+logLevel 3 sysbus
+
+# 3. [GIẢI PHÁP TỐC ĐỘ] Gọi đích danh sysbus.cpu và ép tốc độ 10 MIPS
+sysbus.cpu PerformanceInMips 10
+
+# 4. Mở cửa sổ giao diện UART (cũng gọi đích danh sysbus.uart0)
+showAnalyzer sysbus.uart0
+
+# 5. Macro nạp hệ điều hành
+macro reset
+"""
+    sysbus LoadELF $ORIGIN/build/myos.elf
+    
+    # Cheat Code lừa hệ điều hành rằng Clock đã ổn định
+    sysbus WriteDoubleWord 0x400FE050 0xFFFFFFFF
+"""
+
+# 6. Chạy macro nạp code và cất cánh!
+runMacro $reset
+start
+
+/*:name: MyOS on LM3S6965
+:description: Kich ban chay MyOS tren chip ARM Cortex-M3
+
 using sysbus
 
 # 1. Tạo một cỗ máy ảo và nạp thiết kế phần cứng vừa tạo
@@ -22,4 +51,4 @@ macro reset
 
 # 4. Thực thi Macro nạp code và TỰ ĐỘNG CHẠY
 runMacro $reset
-start
+start*/
