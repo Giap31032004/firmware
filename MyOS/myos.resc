@@ -1,0 +1,25 @@
+:name: MyOS on LM3S6965
+:description: Kich ban chay MyOS tren chip ARM Cortex-M3
+
+using sysbus
+
+# 1. Tạo một cỗ máy ảo và nạp thiết kế phần cứng vừa tạo
+mach create "lm3s6965_board"
+machine LoadPlatformDescription $ORIGIN/lm3s6965.repl
+
+# 2. Mở cổng UART0 để xem MyOS in log
+showAnalyzer uart0
+
+# 3. Macro nạp hệ điều hành (chạy mỗi khi Reset hệ thống)
+macro reset
+"""
+    sysbus LoadELF $ORIGIN/build/myos.elf
+    
+    # [Cheat Code] Ghi toàn bộ bit 1 vào thanh ghi RIS (0x400FE050)
+    # Lừa hệ điều hành rằng PLL Clock và mọi thứ đã sẵn sàng
+    sysbus WriteDoubleWord 0x400FE050 0xFFFFFFFF
+"""
+
+# 4. Thực thi Macro nạp code và TỰ ĐỘNG CHẠY
+runMacro $reset
+start

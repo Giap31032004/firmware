@@ -125,3 +125,11 @@ gdb:
 clean:
 	@echo "  CLEAN     $(BUILD_DIR) and log files"
 	@rm -rf $(BUILD_DIR) *.log
+# ====================================================================
+# RENODE SIMULATION
+# ====================================================================
+RENODE_BIN = ./renode_1.15.3_portable/renode
+
+run-renode: all
+	@echo "  RENODE    Booting MyOS..."
+	$(RENODE_BIN) --console --disable-xwt myos.resc

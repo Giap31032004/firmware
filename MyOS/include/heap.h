@@ -2,20 +2,19 @@
 #define MEMORY_H
 
 #include <stdint.h>
-#include <stddef.h> //  for create size_t
+#include <stddef.h>
 
 #define HEAP_SIZE (32 * 1024) // 32 KB heap size
 
-typedef struct mem_block {
-    struct mem_block * next;
-    size_t size;
-    uint8_t is_free;
-} mem_block_t;
+/* Khởi tạo hệ thống quản lý bộ nhớ */
+void os_mem_init(void);
 
-void os_mem_init(void); // create heap
-void* os_malloc(size_t size);
-void os_free(void *ptr);
+/* Cấp phát và thu hồi */
+void* os_malloc(size_t xWantedSize);
+void  os_free(void *pv);
 
+/* Các hàm đo lường sức khỏe RAM (Metrics) */
 size_t os_get_free_heap_size(void);
+size_t os_get_minimum_ever_free_heap_size(void);
 
-#endif
+#endif /* MEMORY_H */

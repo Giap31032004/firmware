@@ -126,7 +126,8 @@ void mpu_config_for_task(PCB_t *task) {
      * Sử dụng hàm mpu_calc_region_size từ mpu.h
      */
     MPU_RNR = R_STACK;
-    MPU_RBAR = (uint32_t)task->stack_base;
+    // Thêm & ~0x1F để ép 5 bit cuối về 0 (Xóa cờ VALID)
+    MPU_RBAR = ((uint32_t)task->stack_base) & ~0x1F;
     
     uint32_t s_size = mpu_calc_region_size(task->stack_size);
     
@@ -142,7 +143,8 @@ void mpu_config_for_task(PCB_t *task) {
      */
     if (task->heap_base != 0 && task->heap_size > 0) {
         MPU_RNR = R_HEAP;
-        MPU_RBAR = (uint32_t)task->heap_base;
+        // Thêm & ~0x1F để ép 5 bit cuối về 0
+        MPU_RBAR = ((uint32_t)task->heap_base) & ~0x1F;
         
         uint32_t h_size = mpu_calc_region_size(task->heap_size);
 
@@ -155,7 +157,8 @@ void mpu_config_for_task(PCB_t *task) {
     } else {
         /* Nếu Task không dùng Heap, TẮT Region này để an toàn */
         MPU_RNR = R_HEAP;
-        MPU_RASR = 0; // Disable
+        /* Chỉ xóa bit số 0 (ENABLE), giữ nguyên các bit khác để phần cứng không nổi điên */
+        MPU_RASR &= ~(1 << MPU_RASR_ENABLE_Pos); 
     }
 
     /* Bật lại MPU */
