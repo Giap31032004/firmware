@@ -1,66 +1,73 @@
 #include "uart.h"
 #include "kernel.h"
+#include "memory_map.h" /* BẮT BUỘC: Đã chứa định nghĩa GPIOA và USART1 */
 #include <stdio.h> 
 
-#define UART0_BASE      0x4000C000
+/* Các bit trạng thái của USART1 (STM32F4) */
+#define USART_SR_RXNE   (1 << 5) /* Cờ: Thanh ghi nhận (RX) có dữ liệu (Not Empty) */
+#define USART_SR_TXE    (1 << 7) /* Cờ: Thanh ghi gửi (TX) trống (Empty) -> Sẵn sàng gửi */
+#define USART_CR1_RXNEIE (1 << 5) /* Cờ: Bật ngắt khi nhận được dữ liệu (RXNE Interrupt Enable) */
 
-#define UART0_DR        (*(volatile uint32_t *)(UART0_BASE + 0x000)) // Data Register
-#define UART0_FR        (*(volatile uint32_t *)(UART0_BASE + 0x018)) // Flag Register
-#define UART0_IBRD      (*(volatile uint32_t *)(UART0_BASE + 0x024)) // Integer Baud Rate Divisor
-#define UART0_FBRD      (*(volatile uint32_t *)(UART0_BASE + 0x028)) // Fractional Baud Rate Divisor
-#define UART0_LCRH      (*(volatile uint32_t *)(UART0_BASE + 0x02C)) // Line Control
-#define UART0_CTL       (*(volatile uint32_t *)(UART0_BASE + 0x030)) // Control
-#define UART0_IM        (*(volatile uint32_t *)(UART0_BASE + 0x038)) // Interrupt Mask
-#define UART0_ICR       (*(volatile uint32_t *)(UART0_BASE + 0x044)) // Interrupt Clear
-
-// Cờ trạng thái (Flags)
-#define UART_FR_RXFE    (1 << 4) // FIFO Nhận đang rỗng
-#define UART_FR_TXFF    (1 << 5) // FIFO Gửi đang đầy
-#define UART_RXIM       (1 << 4) // Bit cho phép ngắt nhận (RX Interrupt Mask)
-
-// NVIC (Quản lý ngắt ngoại vi)
-#define NVIC_EN0        (*(volatile uint32_t *)0xE000E100) // Enable IRQ 0-31
+/* NVIC cho STM32F4 (Interrupt Controller) */
+#define NVIC_ISER1      (*(volatile uint32_t *)0xE000E104) /* Thanh ghi bật ngắt từ IRQ32 đến IRQ63 */
 
 #define RX_BUFFER_SIZE 128
 static volatile char rx_buffer[RX_BUFFER_SIZE];
 static volatile int rx_head = 0;
 static volatile int rx_tail = 0;
 
-// Semaphore: Báo hiệu có dữ liệu mới -> Đánh thức Task đang gọi uart_getc
+/* Semaphore & Mutex cho đa nhiệm */
 os_sem_t uart_rx_semaphore;
-
-// Mutex: Khóa quyền in -> Chỉ 1 Task được in tại 1 thời điểm
 os_mutex_t uart_tx_mutex; 
 
 /* =============================================================
-   HÀM KHỞI TẠO
+   HÀM KHỞI TẠO (STM32F407 - USART1 ở tốc độ 115200)
    ============================================================= */
 void uart_init(void) {
+    /* Khởi tạo OS Sync Objects */
     sem_init(&uart_rx_semaphore, 0); 
     mutex_init(&uart_tx_mutex);      
 
-    /* 2. Tắt UART trước khi cấu hình */
-    UART0_CTL &= ~0x01; // Clear bit 0 (UARTEN)
+    /* 1. Bật nguồn (Clock) cho GPIOA và USART1 */
+    RCC->AHB1ENR |= (1 << 0);   /* Bit 0: GPIOA EN */
+    RCC->APB2ENR |= (1 << 4);   /* Bit 4: USART1 EN */
 
-    UART0_IBRD = 27; 
-    UART0_FBRD = 8;
+    /* 2. Cấu hình chân PA9 (TX) và PA10 (RX) sang chế độ Alternate Function */
+    GPIOA->MODER &= ~((3 << (9 * 2)) | (3 << (10 * 2))); /* Xóa cấu hình cũ */
+    GPIOA->MODER |=  ((2 << (9 * 2)) | (2 << (10 * 2))); /* Đặt thành 10 (AF mode) */
 
-    UART0_LCRH = (0x3 << 5) | (1 << 4); 
-    UART0_IM |= UART_RXIM;  
-    UART0_CTL |= (1 << 0) | (1 << 8) | (1 << 9); 
-    NVIC_EN0 |= (1 << 5); 
+    /* Chọn AF7 cho PA9 và PA10 (AF7 là chức năng USART1-3) */
+    GPIOA->AFR[1] &= ~((0xF << (1 * 4)) | (0xF << (2 * 4))); /* Xóa AF cũ của Pin 9 (AFR[1] bit 4-7) và Pin 10 (bit 8-11) */
+    GPIOA->AFR[1] |=  ((7 << (1 * 4)) | (7 << (2 * 4)));     /* Đặt thành AF7 */
+
+    /* 3. Cấu hình USART1 */
+    USART1->CR1 = 0x00; /* Tắt USART1 đi để cấu hình cho an toàn */
+
+    /* Tốc độ Baud: Xung nhịp mặc định HSI là 16MHz. Để đạt 115200 baud -> BRR = 0x8A */
+    USART1->BRR = 0x008A;
+    
+    /* Bật UART (UE, bit 13), Bật bộ phát (TE, bit 3), Bật bộ thu (RE, bit 2) */
+    USART1->CR1 |= (1 << 13) | (1 << 3) | (1 << 2); 
+
+    /* 4. Cấu hình Ngắt (Interrupt) cho việc nhận dữ liệu */
+    USART1->CR1 |= USART_CR1_RXNEIE; /* Cho phép ngắt khi cờ RXNE bật lên */
+
+    /* Bật ngắt USART1 trong NVIC. USART1 có IRQ Number là 37 (nằm ở thanh ghi ISER1, bit 5) */
+    NVIC_ISER1 |= (1 << (37 - 32)); 
 }
 
 /* =============================================================
    HÀM NỘI BỘ (INTERNAL) - KHÔNG KHÓA MUTEX
    ============================================================= */
 void uart_putc_raw(char c) {
-    while (UART0_FR & UART_FR_TXFF); 
-    UART0_DR = c;
+    /* Chờ cho đến khi cờ TXE (Transmit Data Register Empty) bật lên mức 1 */
+    while (!(USART1->SR & USART_SR_TXE)); 
+    /* Đẩy dữ liệu vào thanh ghi Data Register */
+    USART1->DR = c;
 }
 
 /* =============================================================
-   HÀM PUBLIC (API)
+   HÀM PUBLIC (API) - GIỮ NGUYÊN HOÀN TOÀN LOGIC CŨ!
    ============================================================= */
 void uart_putc(char c) {
     mutex_lock(&uart_tx_mutex);
@@ -68,19 +75,15 @@ void uart_putc(char c) {
     mutex_unlock(&uart_tx_mutex);
 }
 
-// In chuỗi an toàn (Thread-safe)
 void uart_print(const char *s) {
     mutex_lock(&uart_tx_mutex);
-    
     while (*s) {
         if (*s == '\n') uart_putc_raw('\r');
         uart_putc_raw(*s++);
     }
-    
     mutex_unlock(&uart_tx_mutex); 
 }
 
-// Nhận ký tự (Blocking)
 char uart_getc(void) {
     sem_wait(&uart_rx_semaphore);
     
@@ -93,50 +96,41 @@ char uart_getc(void) {
 }
 
 /* =============================================================
-   INTERRUPT SERVICE ROUTINE (ISR)
+   INTERRUPT SERVICE ROUTINE (ISR) - DÀNH CHO STM32F4
    ============================================================= */
-void UART0_Handler(void) {
-    // 1. Xóa cờ ngắt (Bắt buộc)
-    UART0_ICR |= UART_RXIM;
-
-    // 2. Đọc hết FIFO phần cứng 
-    while((UART0_FR & UART_FR_RXFE) == 0) {
-        char c = (char)(UART0_DR & 0xFF);
+/* Lưu ý: Tên hàm này PHẢI khớp chính xác với tên trong file startup.s của bạn! */
+void USART1_Handler(void) {
+    /* Kiểm tra xem ngắt này có phải do "Có dữ liệu đến" (RXNE) sinh ra không */
+    if (USART1->SR & USART_SR_RXNE) {
+        /* Đọc dữ liệu ra từ Data Register (Việc đọc này sẽ tự động xóa cờ ngắt RXNE) */
+        char c = (char)(USART1->DR & 0xFF);
         
-        // Ghi vào Ring Buffer
+        /* Ghi vào Ring Buffer */
         int next_head = (rx_head + 1) % RX_BUFFER_SIZE;
         if (next_head != rx_tail) { 
             rx_buffer[rx_head] = c;
             rx_head = next_head;
             
+            /* Đánh thức Task đang chờ lệnh uart_getc() */
             sem_signal(&uart_rx_semaphore);
-        } else {
-            // Buffer tràn: Có thể bỏ qua hoặc log lỗi
         }
     }
 }
 
 /* =============================================================
-   PRINTF INTEGRATION (HOOK)
-   Hàm này giúp printf("%d", 123) hoạt động!
+   PRINTF INTEGRATION (HOOK) & LEGACY FUNCTIONS
+   (Phần này logic C thuần túy, KHÔNG CHẠM VÀO PHẦN CỨNG NÊN GIỮ NGUYÊN 100%)
    ============================================================= */
 int _write(int file, char *ptr, int len) {
-    mutex_lock(&uart_tx_mutex); // Khóa 1 lần cho cả chuỗi dài -> Hiệu suất cao
-    
+    mutex_lock(&uart_tx_mutex); 
     for (int i = 0; i < len; i++) {
         if (ptr[i] == '\n') uart_putc_raw('\r');
         uart_putc_raw(ptr[i]);
     }
-    
     mutex_unlock(&uart_tx_mutex);
     return len;
 }
 
-/* =============================================================
-   LEGACY SUPPORT FUNCTIONS
-   ============================================================= */
-
-// Helper: Chuyển 4 bit (0-15) thành ký tự Hex
 static char nibble_to_hex(uint8_t nibble) {
     return (nibble < 10) ? ('0' + nibble) : ('A' + (nibble - 10));
 }
@@ -146,7 +140,7 @@ void uart_print_hex(uint8_t n) {
     str[0] = nibble_to_hex((n >> 4) & 0x0F);
     str[1] = nibble_to_hex(n & 0x0F);
     str[2] = '\0';
-    uart_print(str); // Tái sử dụng hàm thread-safe
+    uart_print(str); 
 }
 
 void uart_print_dec(uint32_t val) {
@@ -160,27 +154,19 @@ void uart_print_dec(uint32_t val) {
         buf[i++] = '0' + (val % 10);
         val /= 10;
     }
-    // Đảo ngược chuỗi để in
     mutex_lock(&uart_tx_mutex);
     while (i > 0) uart_putc_raw(buf[--i]);
     mutex_unlock(&uart_tx_mutex);
 }
 
-/* Hàm in số 32-bit dạng Hex (0x1234ABCD) - SỬ DỤNG LẠI nibble_to_hex */
 void uart_print_hex32(uint32_t n) {
     char str[11];
     str[0] = '0';
     str[1] = 'x';
-    
-    // In từ byte cao nhất (MSB) xuống thấp nhất
     for (int i = 0; i < 8; i++) {
-        // Dịch để lấy từng cụm 4 bit (nibble), bắt đầu từ bit 28
         uint8_t nibble = (n >> (28 - (i * 4))) & 0x0F;
-        str[2 + i] = nibble_to_hex(nibble); // Sử dụng lại hàm ở trên
+        str[2 + i] = nibble_to_hex(nibble);
     }
     str[10] = '\0';
-    
-    // Dùng hàm in an toàn thread-safe
     uart_print(str);
 }
-

@@ -1,0 +1,21 @@
+:name: MyOS on STM32F407
+:description: Kich ban chay MyOS tren board STM32F4 Discovery
+
+$bin?=@build/myos.elf
+
+mach create "stm32f407_board"
+
+machine LoadPlatformDescription @platforms/boards/stm32f4_discovery-kit.repl
+
+logLevel 2 sysbus
+
+showAnalyzer sysbus.usart1
+showAnalyzer sysbus.usart2
+
+macro reset
+"""
+    sysbus LoadELF $bin
+"""
+
+runMacro $reset
+start

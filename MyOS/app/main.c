@@ -11,10 +11,11 @@
 #include <stddef.h>   
 
 /* ================================================= */
-/* CẤU HÌNH HỆ THỐNG                                 */
+/* CẤU HÌNH HỆ THỐNG (Đã cập nhật cho STM32F407)     */
 /* ================================================= */
-#define SYSTEM_CLOCK      50000000 
-#define SYSTICK_RATE      10000000 
+#define SYSTEM_CLOCK      16000000U   /* Xung nhịp mặc định HSI 16MHz */
+/* Tính toán bộ đếm SysTick để tạo ra nhịp đập (OS Tick) là 1ms (1000Hz) */
+#define SYSTICK_RATE      (SYSTEM_CLOCK / 1000U) /* Kết quả = 16000 */
 
 
 
@@ -73,8 +74,8 @@ int main(void) {
 
     /* 7. Vòng lặp Idle */
     while (1) {
-        // CPU sẽ chạy vào đây khi không có task nào khác hoạt động
-        // Có thể đưa CPU vào chế độ ngủ (Sleep mode) để tiết kiệm điện
-        // __asm("wfi"); // Wait For Interrupt
+        // Đưa CPU vào chế độ ngủ (Sleep mode) để tiết kiệm điện
+        // CPU sẽ thức dậy ngay lập tức khi có ngắt (ví dụ SysTick hoặc UART)
+        __asm("wfi"); // Wait For Interrupt
     }
 }

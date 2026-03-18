@@ -15,7 +15,6 @@ void task_sensor_update(void) {
             local_temp -= 5;
             if(local_temp <= 20) direction = 1;
         }
-
         msg_queue_send(&temp_queue, local_temp);
     }
 }

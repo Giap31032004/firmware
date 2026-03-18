@@ -5,8 +5,8 @@
 #include "sync.h" 
 
 /* --- CẤU HÌNH --- */
-#define SYSTEM_CLOCK_HZ    50000000U  
-#define UART_BAUDRATE    115200U
+#define SYSTEM_CLOCK_HZ    16000000U  // Cập nhật lại: STM32F407 chạy mặc định 16MHz (HSI)
+#define UART_BAUDRATE      115200U
 
 /* --- PUBLIC FUNCTIONS --- */
 void uart_init(void);

@@ -56,7 +56,6 @@ void process_create(void (*func)(void), uint32_t pid, uint8_t priority, int *max
     if (pid >= MAX_PROCESSES) return; 
 
     PCB_t *p = &pcb_table[pid]; 
-    
 
     uint32_t stack_size_bytes = STACK_SIZE * 4; // 1kB stack
     uint32_t *stack_base = (uint32_t*)os_malloc(stack_size_bytes); 
@@ -79,16 +78,24 @@ void process_create(void (*func)(void), uint32_t pid, uint8_t priority, int *max
     addr = addr & 0xFFFFFFF8; // Align to 8 bytes
     uint32_t *sp = (uint32_t*)addr;
 
-    /* Fake Context setup */
-    *(--sp) = 0x01000000UL; // xPSR
-    *(--sp) = (uint32_t)func; // PC
-    *(--sp) = 0xFFFFFFFDUL; // LR
-    *(--sp) = 0; // R12
-    *(--sp) = 0; // R3
-    *(--sp) = 0; // R2
-    *(--sp) = 0; // R1
-    *(--sp) = 0; // R0
-    for (int i = 0; i < 8; ++i) *(--sp) = 0; // R11-R4
+    /* =========================================================
+       FAKE CONTEXT SETUP CHO CORTEX-M4F (Tổng 17 thanh ghi)
+       ========================================================= */
+    /* 1. HARDWARE FRAME (8 thanh ghi CPU tự động Pop) */
+    *(--sp) = 0x01000000UL;   // xPSR: Bit 24 (T-bit) = 1
+    *(--sp) = (uint32_t)func; // PC: Trỏ đến hàm Task
+    *(--sp) = 0xFFFFFFFDUL;   // LR (Hardware Return): Thread mode, dùng PSP
+    *(--sp) = 0;              // R12
+    *(--sp) = 0;              // R3
+    *(--sp) = 0;              // R2
+    *(--sp) = 0;              // R1
+    *(--sp) = 0;              // R0 (Tham số truyền vào hàm nếu có)
+
+    /* 2. SOFTWARE FRAME (9 thanh ghi mà file .s sẽ Pop) */
+    *(--sp) = 0xFFFFFFFDUL;   // LR (Software): LƯU MÃ EXC_RETURN (Vừa thêm vào)
+    for (int i = 0; i < 8; ++i) {
+        *(--sp) = 0;          // R11-R4
+    }
 
     p->stack_ptr = sp;
     p->pid = pid;

@@ -10,12 +10,16 @@ typedef struct A_BLOCK_LINK {
 #define portBYTE_ALIGNMENT_MASK ( 0x0007 )
 #define heapBLOCK_ALLOCATED_BITMASK ( ( size_t ) 1 << 31 )
 
-/* Kích thước của Header sau khi làm tròn (Đảm bảo luôn chia hết cho 8) */
+/* Kích thước của Header sau khi làm tròn (Đảm bảo luôn chia hết cho 8) 
+*/
 static const size_t xHeapStructSize = ( sizeof( BlockLink_t ) + portBYTE_ALIGNMENT_MASK ) & ~portBYTE_ALIGNMENT_MASK;
 /* Kích thước tối thiểu của một khối có thể bị cắt nhỏ */
 #define heapMINIMUM_BLOCK_SIZE ( ( size_t ) ( xHeapStructSize * 2 ) )
 
-static uint8_t ucHeap[ HEAP_SIZE ] __attribute__((aligned(8)));
+//static uint8_t ucHeap[ HEAP_SIZE ] __attribute__((aligned(8)));
+/* LẤY CÁC CỘT MỐC TỪ FILE LINKER SCRIPT (linker.ld) */
+extern uint32_t _end[];      /* Bắt đầu vùng RAM trống */
+extern uint32_t _estack;   /* Đáy của Stack (cũng là đỉnh của RAM) */
 
 static BlockLink_t xStart, *pxEnd = NULL;
 
@@ -60,23 +64,37 @@ static void prvInsertBlockIntoFreeList( BlockLink_t *pxBlockToInsert ) {
 }
 
 /* -------------------------------------------------------------------------
- * KHỞI TẠO HEAP
+ * KHỞI TẠO HEAP (BẢN NÂNG CẤP CHO STM32F407)
  * ------------------------------------------------------------------------- */
 void os_mem_init( void ) {
     BlockLink_t *pxFirstFreeBlock;
+    
+    /* 1. Lấy địa chỉ bắt đầu (Ép sang uint32_t trước để tính toán) */
+    uint8_t *pucHeapStart = (uint8_t *)((uint32_t)&_end);
+
+    /* Căn lề địa chỉ bắt đầu (Align 8 bytes) để CPU không bị lỗi HardFault khi truy cập */
+    if( ( ( uint32_t ) pucHeapStart & portBYTE_ALIGNMENT_MASK ) != 0 ) {
+        pucHeapStart += ( portBYTE_ALIGNMENT - ( ( uint32_t ) pucHeapStart & portBYTE_ALIGNMENT_MASK ) );
+    }
+
+    /* 2. Lấy địa chỉ kết thúc (Ép sang uint32_t để lùi 4096 bytes mà GCC không báo lỗi) */
+    uint8_t *pucHeapEnd = (uint8_t *)((uint32_t)&_estack - 4096);
+
+    /* Tính toán Kích thước Heap linh hoạt (Lấy RAM tổng - RAM đã dùng) */
+    size_t configTOTAL_HEAP_SIZE = (size_t)(pucHeapEnd - pucHeapStart);
 
     /* Nút ảo xStart trỏ tới đầu Heap */
-    xStart.pxNextFreeBlock = ( void * ) ucHeap;
+    xStart.pxNextFreeBlock = ( void * ) pucHeapStart;
     xStart.xBlockSize = ( size_t ) 0;
 
     /* Nút ảo pxEnd nằm ở tít cuối Heap (đánh dấu kết thúc) */
-    pxEnd = ( void * ) ( ucHeap + HEAP_SIZE - xHeapStructSize );
+    pxEnd = ( void * ) ( pucHeapStart + configTOTAL_HEAP_SIZE - xHeapStructSize );
     pxEnd->xBlockSize = 0;
     pxEnd->pxNextFreeBlock = NULL;
 
     /* Khởi tạo khối trống đầu tiên ôm trọn toàn bộ RAM còn lại */
-    pxFirstFreeBlock = ( void * ) ucHeap;
-    pxFirstFreeBlock->xBlockSize = HEAP_SIZE - xHeapStructSize;
+    pxFirstFreeBlock = ( void * ) pucHeapStart;
+    pxFirstFreeBlock->xBlockSize = configTOTAL_HEAP_SIZE - xHeapStructSize;
     pxFirstFreeBlock->pxNextFreeBlock = pxEnd;
 
     xFreeBytesRemaining = pxFirstFreeBlock->xBlockSize;
