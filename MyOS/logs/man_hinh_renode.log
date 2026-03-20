@@ -1,0 +1,21 @@
+15:40:42.4375 [INFO] usart1: [host: 0.34s (+1.46ms)|virt:       4.9ms (+0s)] Selected process use priority 1
+15:40:42.4375 [INFO] usart1: [host: 0.34s (+0.29ms)|virt:       4.9ms (+0s)] [CTX] Switch: PID 2(Prio 2) -> PID 5(Prio 1)
+15:40:42.4376 [INFO] usart1: [host: 0.34s (+0.33ms)|virt: 4.92ms (+18.16µs)] Selected process use priority 0
+15:40:42.4378 [INFO] usart1: [host:  0.34s (+0.3ms)|virt:      4.92ms (+0s)] [CTX] Switch: PID 5(Prio 1) -> PID 0(Prio 0)
+15:40:42.4382 [INFO] usart1: [host: 0.34s (+0.35ms)|virt: 4.99ms (+70.44µs)] Selected process use priority 5
+15:40:42.4386 [INFO] usart1: [host: 0.34s (+0.46ms)|virt:     5ms (+11.4µs)] [CTX] Switch: PID 0(Prio 0) -> PID 6(Prio 5)
+15:40:42.4389 [INFO] usart1: [host: 0.34s (+0.35ms)|virt:  5.01ms (+9.33µs)] Selected process use priority 5
+15:40:42.4415 [INFO] usart1: [host: 0.34s (+2.43ms)|virt:      5.01ms (+0s)] [CTX] Switch: PID 6(Prio 5) -> PID 7(Prio 5)
+15:40:42.4418 [INFO] usart1: [host: 0.34s (+0.37ms)|virt: 5.03ms (+17.14µs)] Selected process use priority 2
+15:40:42.4421 [INFO] usart1: [host:  0.34s (+0.3ms)|virt:      5.03ms (+0s)] [CTX] Switch: PID 7(Prio 5) -> PID 2(Prio 2)
+15:40:42.4427 [INFO] usart1: [host: 0.34s (+0.63ms)|virt: 5.04ms (+17.14µs)] Selected process use priority 1
+15:40:42.4429 [INFO] usart1: [host: 0.34s (+0.26ms)|virt:      5.04ms (+0s)] [CTX] Switch: PID 2(Prio 2) -> PID 5(Prio 1)
+15:40:42.4434 [INFO] usart1: [host: 0.34s (+0.46ms)|virt: 5.06ms (+17.14µs)] Selected process use priority 0
+15:40:42.4439 [INFO] usart1: [host:  0.34s (+0.5ms)|virt:      5.06ms (+0s)] [CTX] Switch: PID 5(Prio 1) -> PID 0(Prio 0)
+15:40:42.4444 [INFO] usart1: [host: 0.34s (+0.51ms)|virt:  5.21ms (+0.15ms)] Selected process use priority 5
+15:40:42.4447 [INFO] usart1: [host: 0.34s (+0.29ms)|virt:      5.21ms (+0s)] [CTX] Switch: PID 0(Prio 0) -> PID 6(Prio 5)
+15:40:42.4451 [INFO] usart1: [host: 0.34s (+0.46ms)|virt: 5.23ms (+20.73µs)] Selected process use priority 5
+15:40:42.4454 [INFO] usart1: [host: 0.34s (+0.29ms)|virt:      5.23ms (+0s)] [CTX] Switch: PID 6(Prio 5) -> PID 7(Prio 5)
+15:40:42.4460 [INFO] usart1: [host: 0.35s (+0.36ms)|virt: 5.25ms (+17.14µs)] Selected process use priority 2
+15:40:42.4463 [INFO] usart1: [host: 0.35s (+0.47ms)|virt:      5.25ms (+0s)] [CTX] Switch: PID 7(Prio 5) -> PID 2(Prio 2)
+15:40:42.4469 [INFO] usart1: [host: 0.35s (+0.61ms)|virt: 5.27ms (+17.14µs)] Selected process use priority 1
