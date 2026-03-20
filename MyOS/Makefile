@@ -108,8 +108,10 @@ gdb:
 	$(PREFIX)gdb $(BUILD_DIR)/$(TARGET).elf -ex "target remote localhost:1234"
 
 run-renode:
-	./renode_1.15.3_portable/renode --console --disable-xwt stm32.resc
+	./renode_1.16.1/renode --console --disable-xwt stm32.resc
 
+debug-renode:
+	gdb-multiarch $(BUILD_DIR)/$(TARGET).elf -ex "target remote :3333"
 clean:
 	@echo "  CLEAN     $(BUILD_DIR) and log files"
 	@rm -rf $(BUILD_DIR) *.log
