@@ -1,0 +1,17 @@
+# Build artifacts
+build/
+*.o
+*.elf
+*.bin
+*.map
+
+# Runtime logs
+logs/
+*.log
+
+# Local IDE state
+.vscode/
+
+# Bundled/emulator toolchains contain platform-specific links that Git for
+# Windows cannot always traverse.
+scripts/tools/renode/

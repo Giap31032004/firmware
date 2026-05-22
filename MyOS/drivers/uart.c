@@ -112,7 +112,7 @@ void USART1_Handler(void) {
             rx_head = next_head;
             
             /* Đánh thức Task đang chờ lệnh uart_getc() */
-            sem_signal(&uart_rx_semaphore);
+            sem_signal_from_isr(&uart_rx_semaphore);
         }
     }
 }

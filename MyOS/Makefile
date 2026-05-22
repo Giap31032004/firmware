@@ -12,34 +12,49 @@ AS = $(PREFIX)as
 LD = $(PREFIX)ld
 OBJCOPY = $(PREFIX)objcopy
 
-# File Linker Script - Trỏ đúng vào file bạn đang có trong bsp/
-LDSCRIPT = bsp/linker_for_stm32f407.ld
+# File Linker Script
+LDSCRIPT = platform/linker_for_stm32f407.ld
+
+# Includes
+INCLUDES = \
+    -I./kernel/include \
+    -I./config \
+    -I./platform \
+    -I./boards/include \
+    -I./app \
+    -I./drivers \
+    -I./hal \
+    -I./cmsis/core \
+    -I./cmsis/device/stm32f4
 
 # Compiler Flags
 FPU_FLAGS = -mfloat-abi=hard -mfpu=fpv4-sp-d16
-CFLAGS  = -mcpu=cortex-m4 -mthumb $(FPU_FLAGS) -O2 -ffreestanding -nostdlib -g -Wall -std=c99
-
+CFLAGS  = \
+    -mcpu=cortex-m4 \
+    -mthumb \
+    $(FPU_FLAGS) \
+    -DSTM32F407xx \
+    -O2 \
+    -ffreestanding \
+    -nostdlib \
+    -g \
+    -Wall \
+    -std=c99 \
+    $(INCLUDES)
 # Linker Flags
 LDFLAGS = -T $(LDSCRIPT) -nostdlib -Wl,-Map=$(BUILD_DIR)/$(TARGET).map
-
-# Include Paths - SỬA LẠI CHỖ NÀY CHO ĐÚNG THỰC TẾ
-INCLUDES = \
-    -I./include \
-    -I./bsp/include \
-    -I./app \
-    -I./kernel
-
-CFLAGS += $(INCLUDES)
 
 # ====================================================================
 # 2. AUTO-DISCOVERY (TÌM KIẾM FILE TỰ ĐỘNG)
 # ====================================================================
-# Hàm đệ quy cực xịn: Tự động chui vào mọi thư mục con để mò file .c và .s
+# Hàm đệ quy tìm file
 rwildcard = $(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 
-SEARCH_DIRS = app arch bsp drivers hal kernel
+# DANH SÁCH THƯ MỤC CHUẨN (KHÔNG ĐỂ ĐÈ NHAU)
+SEARCH_DIRS = app drivers hal kernel arch platform boards
 
 C_SRCS = $(call rwildcard, $(SEARCH_DIRS), *.c)
+C_SRCS := $(filter-out arch/fault.c,$(C_SRCS))
 ASM_SRCS = $(call rwildcard, $(SEARCH_DIRS), *.s)
 
 # ====================================================================
@@ -53,7 +68,7 @@ OBJS = $(C_OBJS) $(ASM_OBJS)
 # ====================================================================
 # 4. BUILD RULES (QUY TẮC BIÊN DỊCH)
 # ====================================================================
-.PHONY: all clean run run-trace run-debug run-gdb gdb run-renode
+.PHONY: all clean run run-trace run-debug run-gdb gdb run-renode debug-renode
 
 all: $(BUILD_DIR)/$(TARGET).bin
 
@@ -84,9 +99,11 @@ $(BUILD_DIR)/%.o: %.s
 # 5. TIỆN ÍCH (QEMU & RENODE & DEBUG)
 # ====================================================================
 
-# QEMU: Đã đổi máy ảo từ lm3s6965evb sang netduinoplus2 (Cortex-M4F)
+# QEMU Config
 QEMU_MACHINE = netduinoplus2
 QEMU_FLAGS = -M $(QEMU_MACHINE) -kernel $(BUILD_DIR)/$(TARGET).elf -serial mon:stdio -nographic
+RENODE_DIR = ./scripts/tools/renode/renode_1.16.1
+RENODE = $(RENODE_DIR)/renode
 
 run: all
 	@echo "  QEMU      Running $(TARGET).elf on $(QEMU_MACHINE)"
@@ -108,10 +125,11 @@ gdb:
 	$(PREFIX)gdb $(BUILD_DIR)/$(TARGET).elf -ex "target remote localhost:1234"
 
 run-renode:
-	./renode_1.16.1/renode --console --disable-xwt stm32.resc
+	$(RENODE) --console --disable-xwt RenodeOfMe/stm32.resc
 
 debug-renode:
 	gdb-multiarch $(BUILD_DIR)/$(TARGET).elf -ex "target remote :3333"
+
 clean:
 	@echo "  CLEAN     $(BUILD_DIR) and log files"
 	@rm -rf $(BUILD_DIR) *.log

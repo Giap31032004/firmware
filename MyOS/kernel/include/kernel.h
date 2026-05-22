@@ -1,0 +1,39 @@
+#ifndef KERNEL_H
+#define KERNEL_H
+
+#include <stdint.h>
+#include "critical.h"
+
+#define OS_ENTER_CRITICAL() uint32_t __os_irq_state = os_enter_critical()
+#define OS_EXIT_CRITICAL() os_exit_critical(__os_irq_state)
+#define KERNEL_LOG(msg) uart_print(msg)
+#define OS_WAIT_FOREVER UINT32_MAX
+
+typedef enum {
+    OS_OK = 0,
+    OS_TIMEOUT = -1,
+    OS_ERROR = -2
+} os_status_t;
+
+#if defined(OS_ENABLE_ASSERT) && OS_ENABLE_ASSERT
+#define KASSERT(expr) \
+    do { \
+        if (!(expr)) { \
+            kernel_panic("assert", __FILE__, __LINE__); \
+        } \
+    } while (0)
+#else
+#define KASSERT(expr) ((void)0)
+#endif
+
+void kernel_init(void);
+void timer_init(void);
+void os_delay(uint32_t ms);
+void process_timer_tick(void);
+void kernel_panic(const char *reason, const char *file, int line);
+
+extern volatile uint32_t os_tick_count;
+
+void uart_print(const char *s);
+
+#endif /* KERNEL_H */

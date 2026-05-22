@@ -1,0 +1,8 @@
+#include "scb.h"
+#include "rcc.h"
+
+void SystemInit(void) {
+    scb_init();
+    rcc_init();
+}
+

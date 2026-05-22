@@ -1,81 +1,64 @@
 #include "uart.h"
-#include "systick.h"
 #include "kernel.h"
 #include "task.h"       
 #include "sync.h" 
 #include "mpu.h"
 #include "ipc.h"
-#include "gpio.h"
-
 #include <stdint.h>
 #include <stddef.h>   
-
-/* ================================================= */
-/* CẤU HÌNH HỆ THỐNG (Đã cập nhật cho STM32F407)     */
-/* ================================================= */
-#define SYSTEM_CLOCK      16000000U   /* Xung nhịp mặc định HSI 16MHz */
-/* Tính toán bộ đếm SysTick để tạo ra nhịp đập (OS Tick) là 1ms (1000Hz) */
-#define SYSTICK_RATE      (SYSTEM_CLOCK / 1000U) /* Kết quả = 16000 */
-
-
-
-/* ================================================= */
-/* DỮ LIỆU RIÊNG CHO CÁC TASK                        */
-/* ================================================= */
-int max_res_t1[] = {0, 0, 2}; 
-int max_res_t2[] = {0, 0, 2};
+#include "app_global.h"
+#include "board.h"
 
 /* ================================================= */
 /* MAIN FUNCTION                                     */
 /* ================================================= */
 
-/* Hàm delay đơn giản */
-void delay(volatile unsigned int count) {
-    while (count--) {
-        __asm("nop");
-    }
-}
+int main(void)
+{
+    /*------------------------------------------
+      1. Board peripherals
+    ------------------------------------------*/
+    board_init();
+    // uart
+    // gpio
+    // spi/i2c nếu cần
+    // driver-level IRQ enable nếu có
 
-int main(void) {
-    /* Khởi tạo phần cứng cơ bản */
-    uart_init();
-    
-    /* Khởi tạo Kernel */
-    os_kernel_init();
 
-    /* Khởi tạo Tài nguyên (IPC & Sync) */
-    msg_queue_init(&temp_queue);
-    mutex_init(&app_mutex);
-    mutex_init(&mutex_A);
-    mutex_init(&mutex_B);
+    /*------------------------------------------
+      2. Kernel init
+    ------------------------------------------*/
+    kernel_init();
+    // ready queue
+    // scheduler state
+    // idle task
+    mpu_init();
 
-    /* In thông báo khởi động */
-    uart_print("\033[2J"); // Xóa màn hình terminal
-    uart_print("MyOS IoT System Booting...\r\n");
-    
-    /* Tạo các Task */
-    process_create(task_sensor_update, 1, 4, NULL); 
-    process_create(task_display,       2, 2, NULL);       
-    process_create(task_alarm,         3, 3, NULL);         
-    process_create(task_logger,        4, 4, NULL);              
-    process_create(task_shell,         5, 1, NULL);
-    process_create(task_deadlock_1,    6, 5, NULL);
-    process_create(task_deadlock_2,    7, 5, NULL);
-    process_create(task_banker1,       8, 4, max_res_t1);
-    process_create(task_banker2,       9, 4, max_res_t2);
+    /*------------------------------------------
+      3. Optional services
+    ------------------------------------------*/
+    service_init();
+    // mutex
+    // sem
+    // ipc
 
-    // --- Nhóm Test Drivers ---
-    // process_create(task_gpio_blink, 10, 5, NULL); // Task nháy đèn (Tạm tắt)
-    //process_create(task_i2c_scanner,   10, 5, NULL); // Task quét I2C (Mới thêm)
-    //process_create(task_dma_test, 10, 5, NULL); // Task test DMA
 
-    /* Khởi động System Tick ,nhịp tim hệ điều hành */
-    systick_init(SYSTICK_RATE); 
+    /*------------------------------------------
+      4. Create user tasks
+    ------------------------------------------*/
+    app_init();
+    // task_create(...)
+    // lúc này mới có thể setup
+    // per-task MPU regions nếu dùng
 
-    /* 7. Vòng lặp Idle */
-    while (1) {
-        // Đưa CPU vào chế độ ngủ (Sleep mode) để tiết kiệm điện
-        // CPU sẽ thức dậy ngay lập tức khi có ngắt (ví dụ SysTick hoặc UART)
-        __asm("wfi"); // Wait For Interrupt
-    }
+
+    /*------------------------------------------
+      5. Start RTOS
+    ------------------------------------------*/
+    os_start();
+    // SysTick init
+    // PendSV priority
+    // __enable_irq()
+    // first task
+    while(1);
 }

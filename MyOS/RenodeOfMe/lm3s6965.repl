@@ -1,0 +1,27 @@
+// ==============================================================
+// MyOS - LM3S6965 Virtual Hardware Blueprint (REPL)
+// ==============================================================
+
+// 1. Khai báo bộ não (Core Cortex-M3) và bộ điều khiển ngắt (NVIC)
+cpu: CPU.CortexM @ sysbus
+    cpuType: "cortex-m3"
+    nvic: nvic
+
+nvic: IRQControllers.NVIC @ sysbus 0xE000E000
+    -> cpu@0
+
+// 2. Tủ hồ sơ (Flash ROM) 256KB - Nơi chứa myos.bin
+flash: Memory.MappedMemory @ sysbus 0x00000000
+    size: 0x00040000
+
+// 3. Mặt bàn làm việc (SRAM) 64KB - Nơi chứa Heap, Stack, Biến
+sram: Memory.MappedMemory @ sysbus 0x20000000
+    size: 0x00010000
+
+// 4. Mạch UART0 (Để in log ra Terminal)
+// Data Register của LM3S6965 nằm ở đúng địa chỉ 0x4000C000
+uart0: UART.TrivialUart @ sysbus 0x4000C000
+
+// 5. Khối System Control (Để hệ điều hành cấu hình Clock không bị lỗi)
+sysctl: Memory.MappedMemory @ sysbus 0x400FE000
+    size: 0x1000
