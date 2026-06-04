@@ -1,5 +1,8 @@
 #include "app_global.h"
 #include "kernel.h"
+#include "os_trace.h"
+#include "port.h"
+#include "runtime_stats.h"
 #include "task.h"
 #include "uart.h"
 #include "utils.h"
@@ -23,7 +26,16 @@ static void shell_print_help(void)
     uart_print("Available commands:\r\n");
     uart_print("  help        : Show this help\r\n");
     uart_print("  ps          : List tasks\r\n");
+    uart_print("  stats       : Show per-task CPU usage\r\n");
+    uart_print("  trace       : Dump recent RTOS trace events\r\n");
+    uart_print("  traceclear  : Clear RTOS trace buffer\r\n");
     uart_print("  status      : Print app counters\r\n");
+    uart_print("  thermal     : Print thermal snapshot\r\n");
+    uart_print("  heap        : Show heap usage\r\n");
+    uart_print("  queues      : Show queue fill levels\r\n");
+    uart_print("  power       : Show tickless idle status\r\n");
+    uart_print("  events      : Show app event-group bits\r\n");
+    uart_print("  demo        : Show demo flow\r\n");
     uart_print("  stacks      : Check task stack canaries\r\n");
     uart_print("  signal      : Signal heartbeat semaphore\r\n");
     uart_print("  kill <id>   : Kill a task\r\n");
@@ -52,8 +64,27 @@ void task_shell(void)
                 shell_print_help();
             } else if (my_strcmp(cmd_buffer, "ps") == 0) {
                 app_print_task_table();
+            } else if (my_strcmp(cmd_buffer, "stats") == 0) {
+                runtime_stats_print();
+            } else if (my_strcmp(cmd_buffer, "trace") == 0) {
+                os_trace_dump(40U);
+            } else if (my_strcmp(cmd_buffer, "traceclear") == 0) {
+                os_trace_clear();
+                uart_print("[TRACE] cleared\r\n");
             } else if (my_strcmp(cmd_buffer, "status") == 0) {
                 app_print_system_status();
+            } else if (my_strcmp(cmd_buffer, "thermal") == 0) {
+                app_print_system_status();
+            } else if (my_strcmp(cmd_buffer, "heap") == 0) {
+                app_print_heap_status();
+            } else if (my_strcmp(cmd_buffer, "queues") == 0) {
+                app_print_queue_status();
+            } else if (my_strcmp(cmd_buffer, "power") == 0) {
+                app_print_power_status();
+            } else if (my_strcmp(cmd_buffer, "events") == 0) {
+                app_print_event_status();
+            } else if (my_strcmp(cmd_buffer, "demo") == 0) {
+                app_print_demo_summary();
             } else if (my_strcmp(cmd_buffer, "stacks") == 0) {
                 task_check_all_stacks();
                 app_print_line("[STACK] All active task canaries are intact.");
@@ -62,7 +93,7 @@ void task_shell(void)
                 app_print_line("[SHELL] Heartbeat semaphore signaled.");
             } else if (my_strcmp(cmd_buffer, "reboot") == 0) {
                 uart_print("Rebooting...\r\n");
-                *(volatile uint32_t *)0xE000ED0C = 0x05FA0004;
+                port_system_reset();
             } else if (my_strncmp(cmd_buffer, "kill ", 5) == 0) {
                 int tid = parse_tid(cmd_buffer, 5);
                 if (tid >= 0) {

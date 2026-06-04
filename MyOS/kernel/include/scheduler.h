@@ -5,15 +5,16 @@
 #include "kernel_config.h"
 #include "list_macros.h"
 
-typedef struct  TCB TCB_t;
+typedef struct TCB TCB_t;
 
-#define PRIORITY_IDLE       0
-#define PRIORITY_LOW        8
-#define PRIORITY_NORMAL     15
-#define PRIORITY_HIGH       24
-#define PRIORITY_REALTIME   (MAX_PRIORITY - 1)
+#define PRIORITY_IDLE 0
+#define PRIORITY_LOW 8
+#define PRIORITY_NORMAL 15
+#define PRIORITY_HIGH 24
+#define PRIORITY_REALTIME (MAX_PRIORITY - 1)
 
-typedef struct {
+typedef struct
+{
     uint8_t priority;
     uint8_t base_priority;
     uint32_t remaining_ticks;

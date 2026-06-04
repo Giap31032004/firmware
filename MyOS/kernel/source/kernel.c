@@ -5,6 +5,8 @@
 #include "heap.h"
 #include "banker.h"
 #include "port.h"
+#include "os_trace.h"
+#include "runtime_stats.h"
 
 // Cấu trúc một bản ghi log đơn giản
 typedef struct {
@@ -34,13 +36,17 @@ void kernel_init(void) {
     KERNEL_LOG("Booting MyOS Kernel...\r\n");
 
     os_tick_count = 0;
+    runtime_stats_init();
+    os_trace_init();
     scheduler_init_queues();
     task_init();
     timer_init();
     memory_init();
     banker_init();
 
-    task_create(prvIdleTask, PRIORITY_IDLE);
+    if (task_create(prvIdleTask, PRIORITY_IDLE) != OS_OK) {
+        kernel_panic("idle task create failed", __FILE__, __LINE__);
+    }
     KERNEL_LOG("Kernel Initialized. [OK]\r\n");
 }
 

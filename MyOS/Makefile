@@ -41,6 +41,13 @@ CFLAGS  = \
     -Wall \
     -std=c99 \
     $(INCLUDES)
+
+ifneq ($(MYOS_TEST_SCENARIO),)
+CFLAGS += -DMYOS_TEST_SCENARIO=$(MYOS_TEST_SCENARIO)
+endif
+ifneq ($(MYOS_DIAG_DEMO),)
+CFLAGS += -DMYOS_DIAG_DEMO=$(MYOS_DIAG_DEMO)
+endif
 # Linker Flags
 LDFLAGS = -T $(LDSCRIPT) -nostdlib -Wl,-Map=$(BUILD_DIR)/$(TARGET).map
 
@@ -68,7 +75,7 @@ OBJS = $(C_OBJS) $(ASM_OBJS)
 # ====================================================================
 # 4. BUILD RULES (QUY TẮC BIÊN DỊCH)
 # ====================================================================
-.PHONY: all clean run run-trace run-debug run-gdb gdb run-renode debug-renode
+.PHONY: all clean run run-trace run-debug run-gdb gdb run-renode run-renode-capture debug-renode
 
 all: $(BUILD_DIR)/$(TARGET).bin
 
@@ -126,6 +133,9 @@ gdb:
 
 run-renode:
 	$(RENODE) --console --disable-xwt RenodeOfMe/stm32.resc
+
+run-renode-capture:
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/capture-renode-log.ps1
 
 debug-renode:
 	gdb-multiarch $(BUILD_DIR)/$(TARGET).elf -ex "target remote :3333"

@@ -1,85 +1,193 @@
 #include "app_global.h"
 #include "kernel.h"
-#include "scheduler.h"
 #include "uart.h"
 
-void task_sensor_update(void)
+static int virtual_sensor_read_temperature(void)
 {
-    int local_temp = 25;
-    int direction = 1;
+    static int temp = 24;
+    static int direction = 1;
+    static int noise = -2;
 
+    temp += direction * 2;
+    noise++;
+    if (noise > 2) {
+        noise = -2;
+    }
+
+    if (temp >= 58) {
+        direction = -1;
+    } else if (temp <= 22) {
+        direction = 1;
+    }
+
+    return temp + noise;
+}
+
+void task_temp_sampler(void)
+{
     while (1) {
-        os_delay(25);
+        os_delay(APP_TEMP_SAMPLE_PERIOD);
 
-        if (direction > 0) {
-            local_temp += 5;
-            if (local_temp >= 55) {
-                direction = -1;
+        int raw = virtual_sensor_read_temperature();
+
+        if (mutex_lock_timeout(&temp_state_mutex, 5) == OS_OK) {
+            current_temperature = raw;
+            if (raw < min_temperature) {
+                min_temperature = raw;
             }
-        } else {
-            local_temp -= 5;
-            if (local_temp <= 20) {
-                direction = 1;
+            if (raw > max_temperature) {
+                max_temperature = raw;
             }
+            system_uptime += APP_TEMP_SAMPLE_PERIOD;
+            sensor_samples++;
+            mutex_unlock(&temp_state_mutex);
         }
 
-        scheduler_lock();
-        current_temperature = local_temp;
-        system_uptime += 25;
-        sensor_samples++;
-        scheduler_unlock();
-
-        msg_queue_send(&temp_queue, local_temp);
-
-        if (local_temp > APP_TEMP_ALARM_THRESHOLD) {
-            sem_signal(&alarm_sem);
-        }
-
+        msg_queue_send(&temp_raw_queue, &raw);
+        event_group_set_bits(&app_events,
+                             APP_EVENT_SENSOR_SAMPLE |
+                             APP_EVENT_HEARTBEAT);
         sem_signal(&heartbeat_sem);
     }
 }
 
-void task_display(void)
+void task_temp_filter(void)
+{
+    int window[4] = {25, 25, 25, 25};
+    int index = 0;
+    int sum = 100;
+
+    while (1) {
+        int raw = 0;
+        msg_queue_receive(&temp_raw_queue, &raw);
+
+        sum -= window[index];
+        window[index] = raw;
+        sum += raw;
+        index = (index + 1) & 0x3;
+
+        int filtered = sum / 4;
+
+        if (mutex_lock_timeout(&temp_state_mutex, 5) == OS_OK) {
+            filtered_temperature = filtered;
+            filter_samples++;
+            mutex_unlock(&temp_state_mutex);
+        }
+
+        msg_queue_send(&temp_filtered_queue, &filtered);
+        msg_queue_send(&temp_display_queue, &filtered);
+        msg_queue_send(&temp_log_queue, &filtered);
+        event_group_set_bits(&app_events, APP_EVENT_FILTER_UPDATE);
+    }
+}
+
+void task_temp_controller(void)
 {
     while (1) {
-        int received_temp = msg_queue_receive(&temp_queue);
+        int filtered = 0;
+        temp_zone_t next_zone = TEMP_ZONE_NORMAL;
+        int next_fan = 0;
+
+        msg_queue_receive(&temp_filtered_queue, &filtered);
+
+        if (filtered >= APP_TEMP_CRITICAL_THRESHOLD) {
+            next_zone = TEMP_ZONE_CRITICAL;
+            next_fan = 100;
+        } else if (filtered >= APP_TEMP_WARN_THRESHOLD) {
+            next_zone = TEMP_ZONE_WARN;
+            next_fan = 60;
+        }
+
+        if (mutex_lock_timeout(&temp_state_mutex, 5) == OS_OK) {
+            temp_zone = next_zone;
+            fan_pwm_percent = next_fan;
+            control_cycles++;
+            mutex_unlock(&temp_state_mutex);
+        }
+
+        if (next_zone != TEMP_ZONE_NORMAL) {
+            event_group_set_bits(&app_events, APP_EVENT_ALARM_ACTIVE);
+            sem_signal(&alarm_sem);
+        } else {
+            event_group_clear_bits(&app_events, APP_EVENT_ALARM_ACTIVE);
+        }
+
+        event_group_set_bits(&app_events, APP_EVENT_CONTROL_UPDATE);
+    }
+}
+
+void task_temp_display(void)
+{
+    uint32_t frame = 0;
+    uint32_t last_print_tick = 0;
+
+    while (1) {
+        int filtered = 0;
+        app_thermal_snapshot_t snapshot;
+
+        msg_queue_receive(&temp_display_queue, &filtered);
+
+        if (app_get_thermal_snapshot(&snapshot, 5) != OS_OK) {
+            continue;
+        }
+
+        if ((uint32_t)(os_tick_count - last_print_tick) < APP_DISPLAY_PERIOD_TICKS) {
+            continue;
+        }
+        last_print_tick = os_tick_count;
 
         if (mutex_lock_timeout(&app_mutex, 20) == OS_OK) {
-            uart_print("----------------------\r\n");
-            uart_print("| Temp: ");
-            uart_print_dec((uint32_t)received_temp);
-            uart_print(" C         |\r\n");
-            uart_print("----------------------\r\n");
+            uart_print("\r\n+---------------- THERMAL PANEL ----------------+\r\n");
+            uart_print("| frame=");
+            uart_print_dec(frame++);
+            uart_print(" raw=");
+            uart_print_dec((uint32_t)snapshot.raw_temperature);
+            uart_print("C filtered=");
+            uart_print_dec((uint32_t)filtered);
+            uart_print("C |\r\n");
+            uart_print("| zone=");
+            uart_print(app_temp_zone_str(snapshot.zone));
+            uart_print(" fan=");
+            uart_print_dec((uint32_t)snapshot.fan_pwm_percent);
+            uart_print("%\r\n");
+            uart_print("+-----------------------------------------------+\r\n");
             display_updates++;
             mutex_unlock(&app_mutex);
         }
     }
 }
 
-void task_alarm(void)
+void task_temp_alarm(void)
 {
-    int alarm_active = 0;
+    temp_zone_t last_zone = TEMP_ZONE_NORMAL;
 
     while (1) {
-        os_status_t wait_result = sem_wait_timeout(&alarm_sem, 100);
+        os_status_t result = sem_wait_timeout(&alarm_sem, 150);
+        app_thermal_snapshot_t snapshot;
 
-        if (wait_result == OS_TIMEOUT && current_temperature <= APP_TEMP_ALARM_THRESHOLD) {
-            if (alarm_active) {
-                app_print_line("[ALARM] Temperature normal.");
-                alarm_active = 0;
-            }
+        if (app_get_thermal_snapshot(&snapshot, 5) != OS_OK) {
             continue;
         }
 
-        if (current_temperature > APP_TEMP_ALARM_THRESHOLD && !alarm_active) {
+        if (result == OS_TIMEOUT &&
+            snapshot.zone == TEMP_ZONE_NORMAL &&
+            last_zone != TEMP_ZONE_NORMAL) {
+            app_print_line("[ALARM] Thermal state returned to normal.");
+            last_zone = TEMP_ZONE_NORMAL;
+            continue;
+        }
+
+        if (snapshot.zone != TEMP_ZONE_NORMAL && snapshot.zone != last_zone) {
             if (mutex_lock_timeout(&app_mutex, 20) == OS_OK) {
-                uart_print("\r\n!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\r\n");
-                uart_print("!!! [ALARM] WARNING: OVERHEAT !!!\r\n");
-                uart_print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\r\n");
+                uart_print("\r\n!!! THERMAL ");
+                uart_print(app_temp_zone_str(snapshot.zone));
+                uart_print(" alarm, filtered=");
+                uart_print_dec((uint32_t)snapshot.filtered_temperature);
+                uart_print("C !!!\r\n");
                 alarm_events++;
                 mutex_unlock(&app_mutex);
             }
-            alarm_active = 1;
+            last_zone = snapshot.zone;
         }
     }
 }

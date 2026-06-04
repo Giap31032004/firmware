@@ -12,6 +12,31 @@ void banker_init(void)
     system_available[RES_DMA_CH] = 2;
 }
 
+int os_resource_set_claims(const int claims[NUM_RESOURCES])
+{
+    TCB_t *task = current_tcb;
+
+    if (task == NULL || claims == NULL) {
+        return 0;
+    }
+
+    uint32_t irq_state = os_enter_critical();
+
+    for (int i = 0; i < NUM_RESOURCES; i++) {
+        if (claims[i] < 0 || claims[i] < task->res.held[i]) {
+            os_exit_critical(irq_state);
+            return 0;
+        }
+    }
+
+    for (int i = 0; i < NUM_RESOURCES; i++) {
+        task->res.max[i] = claims[i];
+    }
+
+    os_exit_critical(irq_state);
+    return 1;
+}
+
 static int is_safe_state(void)
 {
     int work[NUM_RESOURCES];
@@ -77,7 +102,7 @@ static int is_safe_state(void)
 int request_resources(int request[])
 {
     TCB_t *task = current_tcb;
-    if (task == NULL) {
+    if (task == NULL || request == NULL) {
         return 0;
     }
 
@@ -85,6 +110,12 @@ int request_resources(int request[])
 
     for (int i = 0; i < NUM_RESOURCES; i++) {
         int need = task->res.max[i] - task->res.held[i];
+        if (request[i] < 0) {
+            uart_print("Banker: Error! Negative request.\r\n");
+            os_exit_critical(irq_state);
+            return 0;
+        }
+
         if (request[i] > need) {
             uart_print("Banker: Error! Request > Need.\r\n");
             os_exit_critical(irq_state);
@@ -119,6 +150,36 @@ int request_resources(int request[])
 void release_resources(int release[])
 {
     TCB_t *task = current_tcb;
+    if (task == NULL || release == NULL) {
+        return;
+    }
+
+    uint32_t irq_state = os_enter_critical();
+
+    for (int i = 0; i < NUM_RESOURCES; i++) {
+        if (release[i] < 0) {
+            uart_print("Banker: Error! Negative release.\r\n");
+            os_exit_critical(irq_state);
+            return;
+        }
+
+        if (release[i] > task->res.held[i]) {
+            uart_print("Banker: Error! Release > Held.\r\n");
+            os_exit_critical(irq_state);
+            return;
+        }
+    }
+
+    for (int i = 0; i < NUM_RESOURCES; i++) {
+        task->res.held[i] -= release[i];
+        system_available[i] += release[i];
+    }
+
+    os_exit_critical(irq_state);
+}
+
+void banker_release_all(TCB_t *task)
+{
     if (task == NULL) {
         return;
     }
@@ -126,8 +187,10 @@ void release_resources(int release[])
     uint32_t irq_state = os_enter_critical();
 
     for (int i = 0; i < NUM_RESOURCES; i++) {
-        task->res.held[i] -= release[i];
-        system_available[i] += release[i];
+        if (task->res.held[i] > 0) {
+            system_available[i] += task->res.held[i];
+            task->res.held[i] = 0;
+        }
     }
 
     os_exit_critical(irq_state);

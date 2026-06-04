@@ -1,6 +1,6 @@
 #include "task.h"
 #include "kernel.h"     // Để dùng các hàm của OS (như os_delay)
-#include "driver_gpio.h"
+#include "hal_gpio.h"
 #include <stdint.h>
 #include <stddef.h>     
 
@@ -10,12 +10,12 @@
 void task_gpio_blink(void) {
     /* 1. Cấu hình GPIO (GPIOA, Pin 5 - Thường là LED xanh trên board STM32) 
           Khởi tạo thành Output */
-    gpio_driver_init_output(GPIOA, 5);
+    hal_led_init();
 
     /* 2. Vòng lặp vô tận của task */
     while (1) {
         /* Đảo trạng thái đèn LED */
-        gpio_driver_toggle(GPIOA, 5);
+        hal_led_toggle();
         
         /* [QUAN TRỌNG] Bắt Task đi ngủ trong 500 tick (500ms).
            Trong thời gian ngủ này, Kernel sẽ thu hồi CPU để chạy Task khác 

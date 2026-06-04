@@ -25,7 +25,7 @@ os_mutex_t uart_tx_mutex;
    ============================================================= */
 void uart_init(void) {
     /* Khởi tạo OS Sync Objects */
-    sem_init(&uart_rx_semaphore, 0); 
+    binary_sem_init(&uart_rx_semaphore, 0);
     mutex_init(&uart_tx_mutex);      
 
     /* 1. Bật nguồn (Clock) cho GPIOA và USART1 */

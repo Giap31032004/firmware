@@ -2,204 +2,332 @@
 #include "kernel.h"
 
 typedef struct BLOCK_LINK {
-    struct BLOCK_LINK *NextFreeBlock; /* Chỉ dùng khi khối đang TRỐNG */
-    size_t BlockSize;                    /* Chứa kích thước + Bit đánh dấu đã cấp phát */
-} BlockLink_t;
+    struct BLOCK_LINK *next_free;
+    size_t block_size;
+} block_link_t;
 
-#define BYTE_ALIGNMENT ( 8 ) // căn lề bộ nhớ , 8 byte
-#define BYTE_ALIGNMENT_MASK ( 0x0007 ) // mặt na bit để kiểm tra xem có chia hết cho 8 hay không
-#define BLOCK_ALLOCATED_BITMASK ( ( size_t ) 1 << 31 ) // đánh dấu khối ram được cấp phát hay đang trống
+#define BYTE_ALIGNMENT          8U
+#define BYTE_ALIGNMENT_MASK     (BYTE_ALIGNMENT - 1U)
+#define BLOCK_ALLOCATED_BIT     ((size_t)1U << ((sizeof(size_t) * 8U) - 1U))
+#define BLOCK_SIZE_MASK         (~BLOCK_ALLOCATED_BIT)
+#define MINIMUM_BLOCK_SIZE      ((size_t)(heap_struct_size * 2U))
 
-/* Kích thước của Header sau khi làm tròn (Đảm bảo luôn chia hết cho 8) */
-static const size_t HeapStructSize = ( sizeof( BlockLink_t ) + BYTE_ALIGNMENT_MASK ) & ~BYTE_ALIGNMENT_MASK;
-/* Kích thước tối thiểu của một khối có thể bị cắt nhỏ */
-#define MINIMUM_BLOCK_SIZE ( ( size_t ) ( HeapStructSize * 2 ) )
+extern uint32_t _end[];
+extern uint32_t _estack;
 
-//static uint8_t ucHeap[ HEAP_SIZE ] __attribute__((aligned(8)));
-/* LẤY CÁC CỘT MỐC TỪ FILE LINKER SCRIPT (linker.ld) */
-extern uint32_t _end[];      /* Bắt đầu vùng RAM trống */
-extern uint32_t _estack;   /* Đáy của Stack (cũng là đỉnh của RAM) */
+static const size_t heap_struct_size =
+    (sizeof(block_link_t) + BYTE_ALIGNMENT_MASK) & ~((size_t)BYTE_ALIGNMENT_MASK);
 
-static BlockLink_t Start, *End = NULL;
+static block_link_t start;
+static block_link_t *end_marker = NULL;
+static uint8_t *heap_start_addr = NULL;
+static uint8_t *heap_end_addr = NULL;
 
-/* Biến đo lường (Metrics) */
-static size_t FreeBytesRemaining = 0;
-static size_t MinimumEverFreeBytesRemaining = 0;
-static void InsertBlockIntoFreeList( BlockLink_t *BlockToInsert ) {
-    BlockLink_t *Iterator;
+static size_t free_bytes_remaining = 0;
+static size_t minimum_ever_free_bytes_remaining = 0;
+static size_t largest_free_block = 0;
+static size_t free_block_count = 0;
+
+static int is_aligned_address(uintptr_t value)
+{
+    return (value & BYTE_ALIGNMENT_MASK) == 0U;
+}
+
+static size_t align_size(size_t size)
+{
+    if ((size & BYTE_ALIGNMENT_MASK) != 0U) {
+        size += BYTE_ALIGNMENT - (size & BYTE_ALIGNMENT_MASK);
+    }
+
+    return size;
+}
+
+static void update_fragmentation_metrics(void)
+{
+    size_t largest = 0;
+    size_t count = 0;
+
+    for (block_link_t *block = start.next_free;
+         block != NULL && block != end_marker;
+         block = block->next_free) {
+        size_t block_size = block->block_size & BLOCK_SIZE_MASK;
+        count++;
+
+        if (block_size > largest) {
+            largest = block_size;
+        }
+    }
+
+    largest_free_block = largest;
+    free_block_count = count;
+}
+
+static void insert_block_into_free_list(block_link_t *block_to_insert)
+{
+    block_link_t *iterator;
     uint8_t *puc;
 
-    /* 1. Tìm vị trí để chèn (Đảm bảo pxIterator < pxBlockToInsert < pxIterator->pxNextFreeBlock) */
-    for( Iterator = &Start; Iterator->NextFreeBlock < BlockToInsert; Iterator = Iterator->NextFreeBlock ) {
-        /* Không làm gì cả, chỉ duyệt để tìm nút liền trước */
+    for (iterator = &start;
+         iterator->next_free < block_to_insert;
+         iterator = iterator->next_free) {
     }
 
-    /* 2. Thử gộp với khối TRƯỚC nó (Nếu chúng nằm liền kề nhau trên RAM) */
-    puc = ( uint8_t * ) Iterator;
-    if( ( puc + Iterator->BlockSize ) == ( uint8_t * ) BlockToInsert ) {
-        Iterator->BlockSize += BlockToInsert->BlockSize;
-        BlockToInsert = Iterator; // Nhập khối mới vào khối cũ
+    puc = (uint8_t *)iterator;
+    if ((puc + iterator->block_size) == (uint8_t *)block_to_insert) {
+        iterator->block_size += block_to_insert->block_size;
+        block_to_insert = iterator;
     }
 
-    /* 3. Thử gộp với khối SAU nó (Nếu chúng nằm liền kề nhau trên RAM) */
-    puc = ( uint8_t * ) BlockToInsert;
-    if( ( puc + BlockToInsert->BlockSize ) == ( uint8_t * ) Iterator->NextFreeBlock ) {
-        if( Iterator->NextFreeBlock != End ) {
-            /* Nối size và lấy pointer của thằng đằng sau */
-            BlockToInsert->BlockSize += Iterator->NextFreeBlock->BlockSize;
-            BlockToInsert->NextFreeBlock = Iterator->NextFreeBlock->NextFreeBlock;
+    puc = (uint8_t *)block_to_insert;
+    if ((puc + block_to_insert->block_size) == (uint8_t *)iterator->next_free) {
+        if (iterator->next_free != end_marker) {
+            block_to_insert->block_size += iterator->next_free->block_size;
+            block_to_insert->next_free = iterator->next_free->next_free;
         } else {
-            BlockToInsert->NextFreeBlock = End;
+            block_to_insert->next_free = end_marker;
         }
     } else {
-        /* Không gộp được với thằng đằng sau, chỉ trỏ tới nó */
-        BlockToInsert->NextFreeBlock = Iterator->NextFreeBlock;
+        block_to_insert->next_free = iterator->next_free;
     }
 
-    /* 4. Cập nhật lại liên kết nếu ở bước 2 KHÔNG gộp được với khối trước */
-    if( Iterator != BlockToInsert ) {
-        Iterator->NextFreeBlock = BlockToInsert;
+    if (iterator != block_to_insert) {
+        iterator->next_free = block_to_insert;
     }
 }
 
-/* -------------------------------------------------------------------------
- * KHỞI TẠO HEAP (BẢN NÂNG CẤP CHO STM32F407)
- * ------------------------------------------------------------------------- */
-void memory_init( void ) {
-    BlockLink_t *FirstFreeBlock;
-    
-    /* 1. Lấy địa chỉ bắt đầu (Ép sang uint32_t trước để tính toán) */
-    uint8_t *HeapStart = (uint8_t *)((uint32_t)&_end);
+static int heap_pointer_is_in_range(const void *ptr)
+{
+    const uint8_t *p = (const uint8_t *)ptr;
 
-    /* Căn lề địa chỉ bắt đầu (Align 8 bytes) để CPU không bị lỗi HardFault khi truy cập */
-    if( ( ( uint32_t ) HeapStart & BYTE_ALIGNMENT_MASK ) != 0 ) {
-        HeapStart += ( BYTE_ALIGNMENT - ( ( uint32_t ) HeapStart & BYTE_ALIGNMENT_MASK ) );
-    }
-
-    /* 2. Lấy địa chỉ kết thúc (Ép sang uint32_t để lùi 4096 bytes mà GCC không báo lỗi) */
-    uint8_t *HeapEnd = (uint8_t *)((uint32_t)&_estack - 4096);
-
-    /* Tính toán Kích thước Heap linh hoạt (Lấy RAM tổng - RAM đã dùng) */
-    size_t configTOTAL_HEAP_SIZE = (size_t)(HeapEnd - HeapStart);
-
-    /* Nút ảo xStart trỏ tới đầu Heap */
-    Start.NextFreeBlock = ( void * ) HeapStart;
-    Start.BlockSize = ( size_t ) 0;
-
-    /* Nút ảo pxEnd nằm ở tít cuối Heap (đánh dấu kết thúc) */
-    End = ( void * ) ( HeapStart + configTOTAL_HEAP_SIZE - HeapStructSize );
-    End->BlockSize = 0;
-    End->NextFreeBlock = NULL;
-
-    /* Khởi tạo khối trống đầu tiên ôm trọn toàn bộ RAM còn lại */
-    FirstFreeBlock = ( void * ) HeapStart;
-    FirstFreeBlock->BlockSize = configTOTAL_HEAP_SIZE - HeapStructSize;
-    FirstFreeBlock->NextFreeBlock = End;
-
-    FreeBytesRemaining = FirstFreeBlock->BlockSize;
-MinimumEverFreeBytesRemaining = FirstFreeBlock->BlockSize;
+    return heap_start_addr != NULL &&
+           heap_end_addr != NULL &&
+           p >= (heap_start_addr + heap_struct_size) &&
+           p < heap_end_addr;
 }
 
-/* -------------------------------------------------------------------------
- * CẤP PHÁT BỘ NHỚ (MALLOC)
- * ------------------------------------------------------------------------- */
-void *os_malloc( size_t WantedSize ) {
-    BlockLink_t *Block, *PreviousBlock, *NewBlockLink;
-    void *Return = NULL;
+static int block_header_is_sane(const block_link_t *block)
+{
+    size_t block_size;
+    const uint8_t *block_start = (const uint8_t *)block;
 
-    /* Bỏ qua nếu xin 0 byte, và làm tròn kích thước lên bội số của 8 */
-    if( WantedSize > 0 ) {
-        WantedSize += HeapStructSize; /* Cộng thêm kích thước của Header */
-        /* Căn lề 8 bytes */
-        if( ( WantedSize & BYTE_ALIGNMENT_MASK ) != 0 ) {
-            WantedSize += ( BYTE_ALIGNMENT - ( WantedSize & BYTE_ALIGNMENT_MASK ) );
-        }
+    if (block == NULL ||
+        (const uint8_t *)block < heap_start_addr ||
+        (const uint8_t *)block >= heap_end_addr ||
+        !is_aligned_address((uintptr_t)block)) {
+        return 0;
     }
 
-    OS_ENTER_CRITICAL(); /* AN TOÀN ĐA LUỒNG */
+    block_size = block->block_size & BLOCK_SIZE_MASK;
+
+    if (block_size < heap_struct_size ||
+        (block_size & BYTE_ALIGNMENT_MASK) != 0U ||
+        block_start + block_size > heap_end_addr) {
+        return 0;
+    }
+
+    return 1;
+}
+
+static uint32_t calculate_fragmentation_percent(size_t free_bytes,
+                                                size_t largest_block)
+{
+    if (free_bytes == 0U) {
+        return 0U;
+    }
+
+    return (uint32_t)(100U - ((largest_block * 100U) / free_bytes));
+}
+
+void memory_init(void)
+{
+    block_link_t *first_free_block;
+    uint8_t *heap_start = (uint8_t *)((uint32_t)&_end);
+    uint8_t *heap_end = (uint8_t *)((uint32_t)&_estack - 4096U);
+    size_t total_heap_size;
+
+    if (((uint32_t)heap_start & BYTE_ALIGNMENT_MASK) != 0U) {
+        heap_start += BYTE_ALIGNMENT - ((uint32_t)heap_start & BYTE_ALIGNMENT_MASK);
+    }
+
+    if (heap_end <= heap_start + heap_struct_size) {
+        kernel_panic("heap range invalid", __FILE__, __LINE__);
+    }
+
+    total_heap_size = (size_t)(heap_end - heap_start);
+    total_heap_size &= ~((size_t)BYTE_ALIGNMENT_MASK);
+
+    heap_start_addr = heap_start;
+    heap_end_addr = heap_start + total_heap_size;
+
+    start.next_free = (void *)heap_start_addr;
+    start.block_size = 0U;
+
+    end_marker = (void *)(heap_end_addr - heap_struct_size);
+    end_marker->block_size = 0U;
+    end_marker->next_free = NULL;
+
+    first_free_block = (void *)heap_start_addr;
+    first_free_block->block_size = total_heap_size - heap_struct_size;
+    first_free_block->next_free = end_marker;
+
+    free_bytes_remaining = first_free_block->block_size;
+    minimum_ever_free_bytes_remaining = first_free_block->block_size;
+    update_fragmentation_metrics();
+}
+
+void *os_malloc(size_t wanted_size)
+{
+    block_link_t *block;
+    block_link_t *previous_block;
+    block_link_t *new_block;
+    void *ret = NULL;
+
+    if (wanted_size == 0U) {
+        return NULL;
+    }
+
+    if (wanted_size > (BLOCK_ALLOCATED_BIT - heap_struct_size - BYTE_ALIGNMENT)) {
+        return NULL;
+    }
+
+    wanted_size += heap_struct_size;
+    wanted_size = align_size(wanted_size);
+
+    if (wanted_size == 0U || (wanted_size & BLOCK_ALLOCATED_BIT) != 0U) {
+        return NULL;
+    }
+
+    OS_ENTER_CRITICAL();
     {
-        /* Kiểm tra hợp lệ và còn đủ RAM không */
-        if( ( WantedSize > 0 ) && ( WantedSize <= FreeBytesRemaining ) ) {
-            /* Duyệt danh sách TRỐNG để tìm khối vừa vặn nhất (First-Fit) */
-            PreviousBlock = &Start;
-            Block = Start.NextFreeBlock;
+        if (wanted_size <= free_bytes_remaining) {
+            previous_block = &start;
+            block = start.next_free;
 
-            while( ( Block->BlockSize < WantedSize ) && ( Block->NextFreeBlock != NULL ) ) {
-                PreviousBlock = Block;
-                Block = Block->NextFreeBlock;
+            while (block != end_marker &&
+                   block->block_size < wanted_size &&
+                   block->next_free != NULL) {
+                previous_block = block;
+                block = block->next_free;
             }
 
-            /* Nếu tìm thấy một khối hợp lệ (không phải là pxEnd) */
-            if( Block != End ) {
-                /* Cắt khối này ra khỏi danh sách trống */
-                Return = ( void * ) ( ( ( uint8_t * ) PreviousBlock->NextFreeBlock ) + HeapStructSize );
-                PreviousBlock->NextFreeBlock = Block->NextFreeBlock;
+            if (block != end_marker && block->block_size >= wanted_size) {
+                ret = (void *)(((uint8_t *)block) + heap_struct_size);
+                previous_block->next_free = block->next_free;
 
-                /* Nếu khối tìm được quá to, CẮT NHỎ NÓ RA (Split) */
-                if( ( Block->BlockSize - WantedSize ) > MINIMUM_BLOCK_SIZE ) {
-                    /* Tạo header mới cho phần còn dư */
-                    NewBlockLink = ( void * ) ( ( ( uint8_t * ) Block ) + WantedSize );
-                    NewBlockLink->BlockSize = Block->BlockSize - WantedSize;
-                    Block->BlockSize = WantedSize;
-
-                    /* Ném phần dư này ngược lại vào danh sách trống */
-                    InsertBlockIntoFreeList( NewBlockLink );
+                if ((block->block_size - wanted_size) > MINIMUM_BLOCK_SIZE) {
+                    new_block = (void *)(((uint8_t *)block) + wanted_size);
+                    new_block->block_size = block->block_size - wanted_size;
+                    block->block_size = wanted_size;
+                    insert_block_into_free_list(new_block);
                 }
 
-                /* Cập nhật RAM còn trống */
-                FreeBytesRemaining -= Block->BlockSize;
-                if( FreeBytesRemaining < MinimumEverFreeBytesRemaining ) {
-                    MinimumEverFreeBytesRemaining = FreeBytesRemaining;
+                free_bytes_remaining -= block->block_size;
+                if (free_bytes_remaining < minimum_ever_free_bytes_remaining) {
+                    minimum_ever_free_bytes_remaining = free_bytes_remaining;
                 }
 
-                /* ĐÁNH DẤU LÀ ĐÃ CẤP PHÁT BẰNG BIT 31 (MSB) */
-                Block->BlockSize |= BLOCK_ALLOCATED_BITMASK;
-                Block->NextFreeBlock = NULL;
+                block->block_size |= BLOCK_ALLOCATED_BIT;
+                block->next_free = NULL;
+                update_fragmentation_metrics();
             }
         }
     }
     OS_EXIT_CRITICAL();
 
-    return Return;
+    return ret;
 }
 
-/* -------------------------------------------------------------------------
- * THU HỒI BỘ NHỚ (FREE)
- * ------------------------------------------------------------------------- */
-void os_free( void *pv ) {
-    uint8_t *puc = ( uint8_t * ) pv;
-    BlockLink_t *Link;
+void os_free(void *ptr)
+{
+    uint8_t *payload = (uint8_t *)ptr;
+    block_link_t *block;
+    size_t block_size;
 
-    if( pv != NULL ) {
-        /* Lùi con trỏ lại 8 bytes để lấy cái Header */
-        puc -= HeapStructSize;
-        Link = ( void * ) puc;
-
-        OS_ENTER_CRITICAL(); /* AN TOÀN ĐA LUỒNG */
-        {
-            /* Kiểm tra xem khối này có thực sự đang được cấp phát không? (Tránh free 2 lần) */
-            if( ( Link->BlockSize & BLOCK_ALLOCATED_BITMASK ) != 0 ) {
-                if( Link->NextFreeBlock == NULL ) {
-                    /* Xóa bit đánh dấu, trả về kích thước gốc */
-                    Link->BlockSize &= ~BLOCK_ALLOCATED_BITMASK;
-
-                    /* Cập nhật lại RAM trống */
-                    FreeBytesRemaining += Link->BlockSize;
-
-                    /* Gọi thuật toán thần thánh để trả về mảng và TỰ ĐỘNG GỘP KHỐI */
-                    InsertBlockIntoFreeList( ( BlockLink_t * ) Link );
-                }
-            }
-        }
-        OS_EXIT_CRITICAL();
+    if (ptr == NULL) {
+        return;
     }
+
+    if (!heap_pointer_is_in_range(ptr) ||
+        !is_aligned_address((uintptr_t)ptr)) {
+        kernel_panic("heap free invalid pointer", __FILE__, __LINE__);
+    }
+
+    block = (void *)(payload - heap_struct_size);
+
+    OS_ENTER_CRITICAL();
+    {
+        if (!block_header_is_sane(block)) {
+            kernel_panic("heap free corrupt header", __FILE__, __LINE__);
+        }
+
+        if ((block->block_size & BLOCK_ALLOCATED_BIT) == 0U) {
+            kernel_panic("heap double free", __FILE__, __LINE__);
+        }
+
+        if (block->next_free != NULL) {
+            kernel_panic("heap allocated block corrupt", __FILE__, __LINE__);
+        }
+
+        block->block_size &= BLOCK_SIZE_MASK;
+        block_size = block->block_size;
+
+        if (block_size > (BLOCK_ALLOCATED_BIT - free_bytes_remaining)) {
+            kernel_panic("heap free accounting overflow", __FILE__, __LINE__);
+        }
+
+        free_bytes_remaining += block_size;
+        insert_block_into_free_list(block);
+        update_fragmentation_metrics();
+    }
+    OS_EXIT_CRITICAL();
 }
 
-/* Hàm phụ trợ lấy thông tin cho giao diện Shell */
-size_t os_get_free_heap_size( void ) {
-    return FreeBytesRemaining;
+size_t os_get_free_heap_size(void)
+{
+    return free_bytes_remaining;
 }
 
-size_t os_get_minimum_ever_free_heap_size( void ) {
-    return MinimumEverFreeBytesRemaining;
+size_t os_get_minimum_ever_free_heap_size(void)
+{
+    return minimum_ever_free_bytes_remaining;
+}
+
+size_t os_get_largest_free_block(void)
+{
+    return largest_free_block;
+}
+
+uint32_t os_get_heap_fragmentation_percent(void)
+{
+    return calculate_fragmentation_percent(free_bytes_remaining,
+                                           largest_free_block);
+}
+
+void os_get_heap_stats(os_heap_stats_t *stats)
+{
+    if (stats == NULL) {
+        return;
+    }
+
+    OS_ENTER_CRITICAL();
+    {
+        stats->free_bytes = free_bytes_remaining;
+        stats->minimum_ever_free_bytes = minimum_ever_free_bytes_remaining;
+        stats->largest_free_block = largest_free_block;
+        stats->free_block_count = free_block_count;
+        stats->fragmentation_percent =
+            calculate_fragmentation_percent(free_bytes_remaining,
+                                            largest_free_block);
+    }
+    OS_EXIT_CRITICAL();
+}
+
+size_t get_free_heap_size(void)
+{
+    return os_get_free_heap_size();
+}
+
+size_t get_minimum_ever_free_heap_size(void)
+{
+    return os_get_minimum_ever_free_heap_size();
 }

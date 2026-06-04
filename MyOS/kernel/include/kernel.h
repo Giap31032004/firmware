@@ -30,10 +30,13 @@ void kernel_init(void);
 void timer_init(void);
 void os_delay(uint32_t ms);
 void process_timer_tick(void);
+void timer_step_ticks(uint32_t ticks);
 void kernel_panic(const char *reason, const char *file, int line);
 
 extern volatile uint32_t os_tick_count;
 
 void uart_print(const char *s);
+
+#include "timer.h"
 
 #endif /* KERNEL_H */

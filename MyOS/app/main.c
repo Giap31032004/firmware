@@ -2,7 +2,6 @@
 #include "kernel.h"
 #include "task.h"       
 #include "sync.h" 
-#include "mpu.h"
 #include "ipc.h"
 #include <stdint.h>
 #include <stddef.h>   
@@ -32,7 +31,6 @@ int main(void)
     // ready queue
     // scheduler state
     // idle task
-    mpu_init();
 
     /*------------------------------------------
       3. Optional services

@@ -18,13 +18,17 @@ typedef struct resource_info {
     int max[NUM_RESOURCES];
 } resource_info_t;
 
+typedef struct TCB TCB_t;
+
 /* ================= SYSTEM STATE ================= */
 extern int system_available[NUM_RESOURCES];
 
 /* ================= BANKER API ================= */
 /* Banker operates on TASK, but does NOT own it */
 void banker_init(void);
+int os_resource_set_claims(const int claims[NUM_RESOURCES]);
 int request_resources(int request[]);
 void release_resources(int release[]);
+void banker_release_all(TCB_t *task);
 
 #endif /* MYOS_KERNEL_BANKER_H */

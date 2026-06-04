@@ -1,111 +1,111 @@
 #include "app_global.h"
 #include "banker.h"
 #include "kernel.h"
-#include "scheduler.h"
 #include "uart.h"
 
-static void configure_resource_claims(void)
+static void configure_storage_claims(void)
 {
-    if (current_tcb == NULL) {
-        return;
-    }
-
-    current_tcb->res.max[RES_UART] = 1;
-    current_tcb->res.max[RES_I2C] = 0;
-    current_tcb->res.max[RES_DMA_CH] = 1;
+    int claims[] = {1, 0, 1};
+    (void)os_resource_set_claims(claims);
 }
 
-void task_resource_user_a(void)
+void task_temp_storage(void)
 {
     int dma_request[] = {0, 0, 1};
 
-    configure_resource_claims();
+    configure_storage_claims();
 
     while (1) {
-        os_delay(75);
+        os_delay(250);
 
-        if (request_resources(dma_request)) {
-            if (mutex_lock_timeout(&mutex_A, 20) == OS_OK) {
-                app_print_line("[RES-A] DMA granted, protected work started.");
-                os_delay(30);
-                mutex_unlock(&mutex_A);
-            }
-
-            release_resources(dma_request);
-
-            scheduler_lock();
-            resource_cycles++;
-            scheduler_unlock();
-        } else {
-            app_print_line("[RES-A] DMA denied by Banker.");
+        if (!request_resources(dma_request)) {
+            app_print_line("[STORAGE] DMA unavailable, record skipped.");
+            continue;
         }
-    }
-}
 
-void task_resource_user_b(void)
-{
-    int dma_request[] = {0, 0, 1};
+        if (mutex_lock_timeout(&storage_mutex, 20) == OS_OK) {
+            app_thermal_snapshot_t snapshot;
 
-    configure_resource_claims();
-
-    while (1) {
-        os_delay(95);
-
-        if (request_resources(dma_request)) {
-            os_status_t lock_result = mutex_lock_timeout(&mutex_A, 10);
-
-            if (lock_result == OS_OK) {
-                app_print_line("[RES-B] DMA granted, mutex acquired.");
-                os_delay(15);
-                mutex_unlock(&mutex_A);
-            } else {
-                app_print_line("[RES-B] Mutex timeout while holding DMA.");
+            if (app_get_thermal_snapshot(&snapshot, 5) == OS_OK &&
+                mutex_lock_timeout(&app_mutex, 20) == OS_OK) {
+                uart_print("[STORAGE] saved temp=");
+                uart_print_dec((uint32_t)snapshot.filtered_temperature);
+                uart_print("C min=");
+                uart_print_dec((uint32_t)snapshot.min_temperature);
+                uart_print("C max=");
+                uart_print_dec((uint32_t)snapshot.max_temperature);
+                uart_print("C\r\n");
+                mutex_unlock(&app_mutex);
             }
 
-            release_resources(dma_request);
+            os_delay(10);
+            mutex_unlock(&storage_mutex);
+        }
 
-            scheduler_lock();
-            resource_cycles++;
-            scheduler_unlock();
-        } else {
-            app_print_line("[RES-B] DMA denied by Banker.");
+        release_resources(dma_request);
+
+        if (mutex_lock_timeout(&temp_state_mutex, 5) == OS_OK) {
+            storage_cycles++;
+            mutex_unlock(&temp_state_mutex);
         }
     }
 }
 
 void task_health_monitor(void)
 {
+    uint32_t missed_heartbeats = 0;
+
     while (1) {
-        os_status_t status = sem_wait_timeout(&heartbeat_sem, 250);
+        os_status_t status = sem_wait_timeout(&heartbeat_sem, 300);
 
         if (status == OS_TIMEOUT) {
-            app_print_line("[HEALTH] Heartbeat timeout.");
+            missed_heartbeats++;
+            if (mutex_lock_timeout(&app_mutex, 20) == OS_OK) {
+                uart_print("[HEALTH] missed heartbeat count=");
+                uart_print_dec(missed_heartbeats);
+                uart_print("\r\n");
+                mutex_unlock(&app_mutex);
+            }
         }
 
         task_check_all_stacks();
 
-        if ((sensor_samples % 20U) == 0U) {
+        app_thermal_snapshot_t snapshot;
+        if (app_get_thermal_snapshot(&snapshot, 5) == OS_OK &&
+            snapshot.sensor_samples != 0U &&
+            (snapshot.sensor_samples % 32U) == 0U) {
             app_print_system_status();
+            os_delay(1);
         }
     }
 }
 
+void task_resource_user_a(void)
+{
+    task_temp_storage();
+}
+
+void task_resource_user_b(void)
+{
+    task_health_monitor();
+}
+
 void task_deadlock_1(void)
 {
-    task_resource_user_a();
+    task_temp_storage();
 }
 
 void task_deadlock_2(void)
 {
-    task_resource_user_b();
+    task_health_monitor();
 }
 
 void task_banker1(void)
 {
-    task_resource_user_a();
+    task_temp_storage();
 }
 
 void task_banker2(void)
 {
-    task_resource_user_b();
+    task_health_monitor();
 }
