@@ -31,7 +31,7 @@
 #define RTOS_TEST_SOFTWARE_TIMER    17
 
 #define TEST_EVT_SENSOR_READY       (1U << 0)
-#define TEST_EVT_DMA_DONE           (1U << 1)
+#define TEST_EVT_CONTROL_READY      (1U << 1)
 
 #define MAYBE_UNUSED __attribute__((unused))
 
@@ -682,7 +682,7 @@ static void event_group_waiter_task(void)
 {
     observed_bits = event_group_wait_bits(&test_events,
                                           TEST_EVT_SENSOR_READY |
-                                              TEST_EVT_DMA_DONE,
+                                              TEST_EVT_CONTROL_READY,
                                           1,
                                           1,
                                           20);
@@ -692,8 +692,8 @@ static void event_group_waiter_task(void)
     uart_print("\r\n");
 
     finish_test((observed_bits & (TEST_EVT_SENSOR_READY |
-                                  TEST_EVT_DMA_DONE)) ==
-                    (TEST_EVT_SENSOR_READY | TEST_EVT_DMA_DONE) &&
+                                  TEST_EVT_CONTROL_READY)) ==
+                    (TEST_EVT_SENSOR_READY | TEST_EVT_CONTROL_READY) &&
                     event_group_get_bits(&test_events) == 0U,
                 "event_group");
     idle_forever();
@@ -706,10 +706,10 @@ static void event_group_sensor_task(void)
     idle_forever();
 }
 
-static void event_group_dma_task(void)
+static void event_group_control_task(void)
 {
     task_delay(4);
-    event_group_set_bits(&test_events, TEST_EVT_DMA_DONE);
+    event_group_set_bits(&test_events, TEST_EVT_CONTROL_READY);
     idle_forever();
 }
 
@@ -818,8 +818,8 @@ void rtos_test_init(void)
 #elif MYOS_TEST_SCENARIO == RTOS_TEST_HEAP_FRAGMENT
     task_create(heap_fragment_task, PRIORITY_NORMAL);
 #elif MYOS_TEST_SCENARIO == RTOS_TEST_STACK_OVERFLOW
-    task_create_with_stack(stack_overflow_task, PRIORITY_NORMAL,
-                           OS_MIN_STACK_WORDS, NULL);
+    task_create_dynamic(stack_overflow_task, PRIORITY_NORMAL,
+                        OS_MIN_STACK_WORDS, NULL);
 #elif MYOS_TEST_SCENARIO == RTOS_TEST_MUTEX_OWNER
     task_create(mutex_owner_a, PRIORITY_NORMAL);
     task_create(mutex_owner_b, PRIORITY_HIGH);
@@ -840,7 +840,7 @@ void rtos_test_init(void)
 #elif MYOS_TEST_SCENARIO == RTOS_TEST_EVENT_GROUP
     task_create(event_group_waiter_task, PRIORITY_HIGH);
     task_create(event_group_sensor_task, PRIORITY_NORMAL);
-    task_create(event_group_dma_task, PRIORITY_NORMAL);
+    task_create(event_group_control_task, PRIORITY_NORMAL);
 #elif MYOS_TEST_SCENARIO == RTOS_TEST_SOFTWARE_TIMER
     task_create(software_timer_check_task, PRIORITY_NORMAL);
 #else

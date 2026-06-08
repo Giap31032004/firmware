@@ -5,8 +5,8 @@
  *                  TASK / SCHEDULER LIMITS
  * ========================================================= */
 
-#define MAX_TASKS               20
-#define MAX_PRIORITY            32
+#define MAX_TASKS               8
+#define MAX_PRIORITY            8
 
 #define OS_USE_PREEMPTION       1
 #define OS_USE_TIME_SLICING     1

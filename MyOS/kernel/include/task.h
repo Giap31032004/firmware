@@ -8,7 +8,6 @@
 #include "scheduler.h"
 #include "heap.h"
 #include "tick.h"
-#include "banker.h"
 #include "memory_layout.h"
 
 /* ================= TASK STATE ================= */
@@ -19,9 +18,6 @@ typedef enum {
     TASK_READY,
     TASK_RUNNING,
     TASK_BLOCKED,
-    TASK_WAITING_TIME,
-    TASK_WAITING_OBJECT,
-    TASK_WAITING_IO,
     TASK_SUSPENDED,
     TASK_TERMINATED
 } task_state_t;
@@ -58,7 +54,6 @@ typedef struct TCB {
     memory_info_t mem;
     task_mpu_t mpu;
     timer_info_t time;
-    resource_info_t res;
 
     list_t *wait_list;
     os_status_t wait_result;
@@ -90,16 +85,18 @@ extern TCB_t tcb_table[MAX_TASKS];
 /* ================= TASK CREATION / LIFECYCLE ================= */
 
 void task_init(void);
-os_status_t task_create(void (*func)(void), uint8_t priority);
-os_status_t task_create_with_stack(void (*func)(void),
-                                   uint8_t priority,
-                                   uint32_t stack_words,
-                                   uint32_t *out_tid);
+os_status_t task_create_dynamic(void (*func)(void),
+                                uint8_t priority,
+                                uint32_t stack_words,
+                                uint32_t *out_tid);
 os_status_t task_create_static(void (*func)(void),
                                uint8_t priority,
                                uint32_t *stack_buffer,
                                uint32_t stack_words,
                                uint32_t *out_tid);
+
+#define task_create(func, priority) \
+    task_create_dynamic((func), (priority), OS_DEFAULT_STACK_WORDS, NULL)
 
 void task_kill(uint32_t tid);
 void task_exit(void);

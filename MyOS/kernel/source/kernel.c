@@ -3,7 +3,6 @@
 #include "scheduler.h"
 #include "task.h"
 #include "heap.h"
-#include "banker.h"
 #include "port.h"
 #include "os_trace.h"
 #include "runtime_stats.h"
@@ -42,7 +41,6 @@ void kernel_init(void) {
     task_init();
     timer_init();
     memory_init();
-    banker_init();
 
     if (task_create(prvIdleTask, PRIORITY_IDLE) != OS_OK) {
         kernel_panic("idle task create failed", __FILE__, __LINE__);

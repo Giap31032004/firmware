@@ -47,7 +47,7 @@ typedef struct {
   volatile uint32_t APB1RSTR;      /* 0x20 */
   volatile uint32_t APB2RSTR;      /* 0x24 */
   uint32_t RESERVED_1[2];          /* 0x28, 0x2C */
-  volatile uint32_t AHB1ENR;       /* 0x30: Bật Clock cho GPIO, DMA */
+  volatile uint32_t AHB1ENR;       /* 0x30: AHB1 peripheral clocks */
   volatile uint32_t AHB2ENR;       /* 0x34 */
   volatile uint32_t AHB3ENR;       /* 0x38 */
   uint32_t RESERVED_2;             /* 0x3C */

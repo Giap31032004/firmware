@@ -19,26 +19,15 @@
 TCB_t tcb_table[MAX_TASKS]; 
 static int total_tasks = 0; 
 static list_t terminated_list;
-static os_status_t task_create_at(void (*func)(void),
-                                  uint32_t tid,
-                                  uint8_t priority,
-                                  uint32_t stack_words,
-                                  uint32_t *out_tid);
-static os_status_t task_create_static_at(void (*func)(void),
-                                         uint32_t tid,
-                                         uint8_t priority,
-                                         uint32_t *stack_buffer,
-                                         uint32_t stack_words,
-                                         uint32_t *out_tid);
-static os_status_t task_setup_at(void (*func)(void),
-                                 uint32_t tid,
-                                 uint8_t priority,
-                                 uint32_t stack_words,
-                                 uint32_t stack_alloc_base,
-                                 uint32_t stack_base,
-                                 uint32_t stack_size_bytes,
-                                 uint8_t dynamic_allocation,
-                                 uint32_t *out_tid);
+static os_status_t task_setup(void (*func)(void),
+                              uint32_t tid,
+                              uint8_t priority,
+                              uint32_t stack_words,
+                              uint32_t stack_alloc_base,
+                              uint32_t stack_base,
+                              uint32_t stack_size_bytes,
+                              uint8_t dynamic_allocation,
+                              uint32_t *out_tid);
 static void prvCleanupTerminatedTasks(void);
 static void task_detach_from_current_list(TCB_t *task);
 static void task_free_stack(TCB_t *task);
@@ -117,10 +106,6 @@ void task_init(void)
         t->runtime_last_start = 0U;
 #endif
         t->dynamic_allocation = 0;
-        for (int i = 0; i < NUM_RESOURCES; i++) {
-            t->res.held[i] = 0;
-            t->res.max[i] = 0;
-        }
     }
 
     total_tasks = 0;
@@ -131,16 +116,17 @@ void task_init(void)
  * VÒNG ĐỜI TIẾN TRÌNH: TẠO MỚI (CREATE)
  * ======================================================================== */
 
-os_status_t task_create(void (*func)(void), uint8_t priority)
+os_status_t task_create_dynamic(void (*func)(void),
+                                uint8_t priority,
+                                uint32_t stack_words,
+                                uint32_t *out_tid)
 {
-    return task_create_with_stack(func, priority, OS_DEFAULT_STACK_WORDS, NULL);
-}
+    uint32_t tid = TASK_INVALID_TID;
+    uint32_t requested_stack_bytes;
+    uint32_t stack_size_bytes;
+    uint32_t stack_base;
+    void *raw_mem;
 
-os_status_t task_create_with_stack(void (*func)(void),
-                                   uint8_t priority,
-                                   uint32_t stack_words,
-                                   uint32_t *out_tid)
-{
     if (out_tid != NULL) {
         *out_tid = TASK_INVALID_TID;
     }
@@ -166,22 +152,54 @@ os_status_t task_create_with_stack(void (*func)(void),
     }
 
     if (func == prvIdleTask) {
-        return task_create_at(func,
-                              IDLE_TASK_TID,
-                              priority,
-                              stack_words,
-                              out_tid);
-    }
-
-    for (uint32_t tid = 0; tid < IDLE_TASK_TID; tid++) {
-        if (tcb_table[tid].state == TASK_UNUSED ||
-            tcb_table[tid].state == TASK_TERMINATED) {
-            return task_create_at(func, tid, priority, stack_words, out_tid);
+        tid = IDLE_TASK_TID;
+    } else {
+        for (uint32_t candidate = 0; candidate < IDLE_TASK_TID; candidate++) {
+            if (tcb_table[candidate].state == TASK_UNUSED ||
+                tcb_table[candidate].state == TASK_TERMINATED) {
+                tid = candidate;
+                break;
+            }
         }
     }
 
-    uart_print("Error: No free task slot.\r\n");
-    return OS_ERROR;
+    if (tid == TASK_INVALID_TID) {
+        uart_print("Error: No free task slot.\r\n");
+        return OS_ERROR;
+    }
+
+    if (tcb_table[tid].state != TASK_UNUSED &&
+        tcb_table[tid].state != TASK_TERMINATED) {
+        uart_print("Error: Task slot is already in use.\r\n");
+        return OS_ERROR;
+    }
+
+    requested_stack_bytes = stack_words * sizeof(uint32_t);
+    stack_size_bytes = task_round_stack_size(requested_stack_bytes);
+    if (stack_size_bytes == 0U ||
+        stack_size_bytes > (UINT32_MAX / 2U)) {
+        uart_print("Error: Task stack too large.\r\n");
+        return OS_ERROR;
+    }
+
+    raw_mem = os_malloc((size_t)stack_size_bytes * 2U);
+    if (raw_mem == NULL) {
+        uart_print("Error: OS Heap Full. Cannot create task.\r\n");
+        return OS_ERROR;
+    }
+
+    stack_base = ((uint32_t)raw_mem + stack_size_bytes - 1U) &
+                 ~(stack_size_bytes - 1U);
+
+    return task_setup(func,
+                      tid,
+                      priority,
+                      stack_words,
+                      (uint32_t)raw_mem,
+                      stack_base,
+                      stack_size_bytes,
+                      1U,
+                      out_tid);
 }
 
 os_status_t task_create_static(void (*func)(void),
@@ -190,6 +208,10 @@ os_status_t task_create_static(void (*func)(void),
                                uint32_t stack_words,
                                uint32_t *out_tid)
 {
+    uint32_t tid = TASK_INVALID_TID;
+    uint32_t stack_size_bytes;
+    uint32_t stack_base;
+
     if (out_tid != NULL) {
         *out_tid = TASK_INVALID_TID;
     }
@@ -220,100 +242,27 @@ os_status_t task_create_static(void (*func)(void),
     }
 
     if (func == prvIdleTask) {
-        return task_create_static_at(func,
-                                     IDLE_TASK_TID,
-                                     priority,
-                                     stack_buffer,
-                                     stack_words,
-                                     out_tid);
-    }
-
-    for (uint32_t tid = 0; tid < IDLE_TASK_TID; tid++) {
-        if (tcb_table[tid].state == TASK_UNUSED ||
-            tcb_table[tid].state == TASK_TERMINATED) {
-            return task_create_static_at(func,
-                                         tid,
-                                         priority,
-                                         stack_buffer,
-                                         stack_words,
-                                         out_tid);
+        tid = IDLE_TASK_TID;
+    } else {
+        for (uint32_t candidate = 0; candidate < IDLE_TASK_TID; candidate++) {
+            if (tcb_table[candidate].state == TASK_UNUSED ||
+                tcb_table[candidate].state == TASK_TERMINATED) {
+                tid = candidate;
+                break;
+            }
         }
     }
 
-    uart_print("Error: No free task slot.\r\n");
-    return OS_ERROR;
-}
-
-static os_status_t task_create_at(void (*func)(void),
-                                  uint32_t tid,
-                                  uint8_t priority,
-                                  uint32_t stack_words,
-                                  uint32_t *out_tid)
-{
-    if (tid >= MAX_TASKS)
-        return OS_ERROR;
-
-    if (tid == IDLE_TASK_TID && func != prvIdleTask)
-        return OS_ERROR;
-
-    TCB_t *t = &tcb_table[tid];
-
-    if (t->state != TASK_UNUSED && t->state != TASK_TERMINATED)
-        return OS_ERROR;
-
-    for (int i = 0; i < NUM_RESOURCES; i++) {
-        t->res.held[i] = 0;
-        t->res.max[i] = 0;
-    }
-
-    uint32_t requested_stack_bytes = stack_words * sizeof(uint32_t);
-    uint32_t stack_size_bytes = task_round_stack_size(requested_stack_bytes);
-
-    if (stack_size_bytes == 0U ||
-        stack_size_bytes > (UINT32_MAX / 2U)) {
-        uart_print("Error: Task stack too large.\r\n");
+    if (tid == TASK_INVALID_TID) {
+        uart_print("Error: No free task slot.\r\n");
         return OS_ERROR;
     }
-
-    void *raw_mem = os_malloc((size_t)stack_size_bytes * 2U);
-    if (raw_mem == NULL) {
-        uart_print("Error: OS Heap Full. Cannot create task.\r\n");
-        return OS_ERROR;
-    }
-
-    uint32_t stack_base = ((uint32_t)raw_mem + stack_size_bytes - 1U) &
-                          ~(stack_size_bytes - 1U);
-
-    return task_setup_at(func,
-                         tid,
-                         priority,
-                         stack_words,
-                         (uint32_t)raw_mem,
-                         stack_base,
-                         stack_size_bytes,
-                         1U,
-                         out_tid);
-}
-
-static os_status_t task_create_static_at(void (*func)(void),
-                                         uint32_t tid,
-                                         uint8_t priority,
-                                         uint32_t *stack_buffer,
-                                         uint32_t stack_words,
-                                         uint32_t *out_tid)
-{
-    uint32_t stack_size_bytes;
-    uint32_t stack_base;
-
-    if (tid >= MAX_TASKS)
-        return OS_ERROR;
-
-    if (tid == IDLE_TASK_TID && func != prvIdleTask)
-        return OS_ERROR;
 
     if (tcb_table[tid].state != TASK_UNUSED &&
-        tcb_table[tid].state != TASK_TERMINATED)
+        tcb_table[tid].state != TASK_TERMINATED) {
+        uart_print("Error: Task slot is already in use.\r\n");
         return OS_ERROR;
+    }
 
     stack_size_bytes = task_round_stack_size(stack_words * sizeof(uint32_t));
     if (stack_size_bytes == 0U ||
@@ -328,33 +277,28 @@ static os_status_t task_create_static_at(void (*func)(void),
         return OS_ERROR;
     }
 
-    return task_setup_at(func,
-                         tid,
-                         priority,
-                         stack_words,
-                         0U,
-                         stack_base,
-                         stack_size_bytes,
-                         0U,
-                         out_tid);
+    return task_setup(func,
+                      tid,
+                      priority,
+                      stack_words,
+                      0U,
+                      stack_base,
+                      stack_size_bytes,
+                      0U,
+                      out_tid);
 }
 
-static os_status_t task_setup_at(void (*func)(void),
-                                 uint32_t tid,
-                                 uint8_t priority,
-                                 uint32_t stack_words,
-                                 uint32_t stack_alloc_base,
-                                 uint32_t stack_base,
-                                 uint32_t stack_size_bytes,
-                                 uint8_t dynamic_allocation,
-                                 uint32_t *out_tid)
+static os_status_t task_setup(void (*func)(void),
+                              uint32_t tid,
+                              uint8_t priority,
+                              uint32_t stack_words,
+                              uint32_t stack_alloc_base,
+                              uint32_t stack_base,
+                              uint32_t stack_size_bytes,
+                              uint8_t dynamic_allocation,
+                              uint32_t *out_tid)
 {
     TCB_t *t = &tcb_table[tid];
-
-    for (int i = 0; i < NUM_RESOURCES; i++) {
-        t->res.held[i] = 0;
-        t->res.max[i] = 0;
-    }
 
     task_fill_stack(stack_base, stack_size_bytes);
 
@@ -492,7 +436,6 @@ void task_kill(uint32_t tid)
     t->wait_has_timeout = 0;
 
     if (current_tcb != NULL && tid == current_tcb->tid) {
-        banker_release_all(t);
         MYOS_TRACE(OS_TRACE_TASK_DELETE, tid, 1U, 0U);
         t->state = TASK_TERMINATED;
         idle_add_terminated_task(t);
@@ -507,7 +450,6 @@ void task_kill(uint32_t tid)
 
     task_free_stack(t);
 
-    banker_release_all(t);
     MYOS_TRACE(OS_TRACE_TASK_DELETE, tid, 0U, 0U);
     t->state = TASK_UNUSED;
     total_tasks--;
@@ -978,7 +920,6 @@ void task_set_terminated(uint32_t tid)
     task->wait_result = OS_ERROR;
     task->wait_has_timeout = 0;
 
-    banker_release_all(task);
     MYOS_TRACE(OS_TRACE_TASK_DELETE, tid, 2U, 0U);
     task->state = TASK_TERMINATED;
 
@@ -1094,13 +1035,6 @@ void task_set_state(uint32_t tid, task_state_t state)
 
     case TASK_BLOCKED:
         task_set_blocked(tid);
-        break;
-
-    case TASK_WAITING_OBJECT:
-    case TASK_WAITING_IO:
-    case TASK_WAITING_TIME:
-        task_set_blocked(tid);
-        task->state = state;
         break;
 
     case TASK_SUSPENDED:

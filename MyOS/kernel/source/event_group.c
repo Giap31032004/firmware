@@ -209,7 +209,7 @@ os_event_bits_t event_group_wait_bits(os_event_group_t *event_group,
             current_tcb->time.wakeup_tick = os_tick_count + timeout_ticks;
         }
 
-        current_tcb->state = TASK_WAITING_OBJECT;
+        current_tcb->state = TASK_BLOCKED;
         list_push_back(&event_group->wait_list, &current_tcb->node);
         os_schedule();
 

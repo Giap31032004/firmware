@@ -168,7 +168,7 @@ os_status_t sem_wait_timeout(os_sem_t *sem, uint32_t timeout_ticks)
         os_exit_critical(irq_state);
 
         os_status_t result = task_block_current_on(&sem->wait_list,
-                                                   TASK_WAITING_OBJECT,
+                                                   TASK_BLOCKED,
                                                    timeout_ticks);
         if (result == OS_OK) {
             return OS_OK;
@@ -328,7 +328,7 @@ os_status_t mutex_lock_timeout(os_mutex_t *mtx, uint32_t timeout_ticks)
         os_exit_critical(irq_state);
 
         os_status_t result = task_block_current_on(&mtx->wait_list,
-                                                   TASK_WAITING_OBJECT,
+                                                   TASK_BLOCKED,
                                                    timeout_ticks);
         if (result == OS_TIMEOUT || result == OS_ERROR) {
             uint32_t recompute_irq_state = os_enter_critical();

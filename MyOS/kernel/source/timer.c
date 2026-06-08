@@ -208,7 +208,7 @@ void os_delay(uint32_t ticks)
         return;
     }
 
-    (void)task_block_current_on(&delay_list, TASK_WAITING_TIME, ticks);
+    (void)task_block_current_on(&delay_list, TASK_BLOCKED, ticks);
 }
 
 void process_timer_tick(void)

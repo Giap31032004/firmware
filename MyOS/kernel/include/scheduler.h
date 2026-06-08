@@ -8,9 +8,9 @@
 typedef struct TCB TCB_t;
 
 #define PRIORITY_IDLE 0
-#define PRIORITY_LOW 8
-#define PRIORITY_NORMAL 15
-#define PRIORITY_HIGH 24
+#define PRIORITY_LOW 1
+#define PRIORITY_NORMAL 3
+#define PRIORITY_HIGH 5
 #define PRIORITY_REALTIME (MAX_PRIORITY - 1)
 
 typedef struct

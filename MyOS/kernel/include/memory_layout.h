@@ -16,7 +16,7 @@
  *   5    STATIC   Guard / NULL   (no access — catches NULL deref
  *                                 and stack overflow sentinel)
  *   6    DYNAMIC  Current task stack   (updated every context switch)
- *   7    DYNAMIC  Current task extra   (heap slice / DMA buffer / etc.)
+ *   7    DYNAMIC  Current task extra   (optional private memory)
  *
  * Reference: ARM DDI0403E, ST RM0090 Rev 19 §8
  */
@@ -149,7 +149,7 @@ typedef struct
  *   rasr       = MPU_AP_FULL | MPU_MEM_NORMAL_WB_WA | MPU_XN
  *
  * extra_region:
- *   Optional — task-private heap slice, DMA buffer, etc.
+ *   Optional — task-private memory region.
  *   Set size_bytes = 0 and rasr = MPU_REGION_DISABLE to leave slot 7 off.
  * ========================================================= */
 typedef struct

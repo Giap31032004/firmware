@@ -1,0 +1,15 @@
+static uint32_t task_round_stack_size(uint32_t requeted_bytes){
+    uint32_t size = 32U;
+    while(size < request && size <= uint32_max / 2u)
+{
+    size <<= 1U;
+}
+if (size < reqiested_byte){
+    return 0U;
+}
+return size 
+}
+
+static void task_clear_mpu (TCB *task){
+    
+}

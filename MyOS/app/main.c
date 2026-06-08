@@ -20,7 +20,6 @@ int main(void)
     board_init();
     // uart
     // gpio
-    // spi/i2c nếu cần
     // driver-level IRQ enable nếu có
 
 
