@@ -18,6 +18,7 @@ LDSCRIPT = platform/linker_for_stm32f407.ld
 # Includes
 INCLUDES = \
     -I./kernel/include \
+    -I./arch \
     -I./config \
     -I./platform \
     -I./boards/include \

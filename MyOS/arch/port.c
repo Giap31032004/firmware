@@ -48,7 +48,7 @@ void port_start_scheduler(uint32_t *first_sp)
     nvic_set_irq_priority(IRQ_SYSTICK, IRQ_PRIO_SYSTICK);
     nvic_set_irq_priority(IRQ_SVC, IRQ_PRIO_SVC);
 
-    if (systick_init(SYSTICK_RATE_HZ) != OS_OK) {
+    if (port_tick_start_periodic() != 0) {
         kernel_panic("systick init failed", __FILE__, __LINE__);
     }
 
@@ -56,6 +56,31 @@ void port_start_scheduler(uint32_t *first_sp)
 
     for (;;) {
     }
+}
+
+int port_tick_start_periodic(void)
+{
+    return systick_init(SYSTICK_RATE_HZ);
+}
+
+void port_tick_stop(void)
+{
+    systick_disable();
+}
+
+void port_tick_clear_pending(void)
+{
+    systick_clear_pending();
+}
+
+uint32_t port_tick_start_oneshot(uint32_t ticks)
+{
+    return systick_start_oneshot(ticks);
+}
+
+uint32_t port_tick_elapsed(uint32_t programmed_ticks)
+{
+    return systick_elapsed_ticks(programmed_ticks);
 }
 
 void port_system_reset(void)

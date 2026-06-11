@@ -1,19 +1,19 @@
 #include <stdint.h>
 
 #include "critical.h"
-#include "hardware_config.h"
 #include "kernel.h"
 #include "kernel_config.h"
 #include "low_power.h"
 #include "os_trace.h"
+#include "port.h"
 #include "scheduler.h"
-#include "systick.h"
 #include "task.h"
 
 static uint32_t low_power_next_timeout_ticks(void)
 {
     uint32_t now = os_tick_count;
     uint32_t best_delta = UINT32_MAX;
+    uint32_t timer_delta;
 
     for (uint32_t i = 0; i < MAX_TASKS; i++) {
         TCB_t *task = &tcb_table[i];
@@ -32,6 +32,11 @@ static uint32_t low_power_next_timeout_ticks(void)
         if (delta < best_delta) {
             best_delta = delta;
         }
+    }
+
+    timer_delta = timer_ticks_until_next_expiry();
+    if (timer_delta < best_delta) {
+        best_delta = timer_delta;
     }
 
     return best_delta;
@@ -85,19 +90,19 @@ void os_low_power_try_sleep(void)
 
     if (expected_idle_ticks == UINT32_MAX) {
         MYOS_TRACE(OS_TRACE_LOW_POWER_BEGIN, current_tcb->tid, expected_idle_ticks, 0U);
-        systick_disable();
+        port_tick_stop();
         __asm volatile ("dsb" ::: "memory");
         __asm volatile ("wfi" ::: "memory");
         __asm volatile ("isb" ::: "memory");
-        (void)systick_init(SYSTICK_RATE_HZ);
+        (void)port_tick_start_periodic();
         MYOS_TRACE(OS_TRACE_LOW_POWER_END, current_tcb->tid, UINT32_MAX, 0U);
         os_exit_critical(irq_state);
         return;
     }
 
-    programmed_ticks = systick_start_oneshot(expected_idle_ticks);
+    programmed_ticks = port_tick_start_oneshot(expected_idle_ticks);
     if (programmed_ticks == 0U) {
-        (void)systick_init(SYSTICK_RATE_HZ);
+        (void)port_tick_start_periodic();
         os_exit_critical(irq_state);
         return;
     }
@@ -107,11 +112,11 @@ void os_low_power_try_sleep(void)
     __asm volatile ("wfi" ::: "memory");
     __asm volatile ("isb" ::: "memory");
 
-    slept_ticks = systick_elapsed_ticks(programmed_ticks);
-    systick_disable();
-    systick_clear_pending();
-    timer_step_ticks(slept_ticks);
-    (void)systick_init(SYSTICK_RATE_HZ);
+    slept_ticks = port_tick_elapsed(programmed_ticks);
+    port_tick_stop();
+    port_tick_clear_pending();
+    tick_step(slept_ticks);
+    (void)port_tick_start_periodic();
     MYOS_TRACE(OS_TRACE_LOW_POWER_END, current_tcb->tid, slept_ticks, programmed_ticks);
 
     os_exit_critical(irq_state);

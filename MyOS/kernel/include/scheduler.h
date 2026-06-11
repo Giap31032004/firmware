@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include "kernel_config.h"
-#include "list_macros.h"
+#include "list.h"
 
 typedef struct TCB TCB_t;
 
@@ -22,10 +22,10 @@ typedef struct
 
 extern TCB_t *current_tcb;
 extern TCB_t *next_tcb;
-extern ready_list_t ready_list[MAX_PRIORITY];
+extern list_t ready_list[MAX_PRIORITY];
 extern uint32_t top_ready_priority_bitmap;
 
-void scheduler_init_queues(void);
+void scheduler_init(void);
 void scheduler_lock(void);
 void scheduler_unlock(void);
 void scheduler_yield_if_needed(void);
@@ -33,8 +33,8 @@ void scheduler_tick(void);
 void os_schedule(void);
 void os_start(void);
 
-void add_task_to_ready_queue(TCB_t *p);
-void remove_task_from_ready_queue(TCB_t *p);
+void add_task_to_ready_queue(TCB_t *task);
+void remove_task_from_ready_queue(TCB_t *task);
 TCB_t *get_highest_priority_ready_task(void);
 
 #endif /* MYOS_KERNEL_SCHEDULER_H */

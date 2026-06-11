@@ -712,7 +712,9 @@ static void event_group_control_task(void)
     event_group_set_bits(&test_events, TEST_EVT_CONTROL_READY);
     idle_forever();
 }
+#endif
 
+#if MYOS_TEST_SCENARIO == RTOS_TEST_SOFTWARE_TIMER
 static void software_timer_oneshot_cb(void *arg)
 {
     (void)arg;

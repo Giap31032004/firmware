@@ -9,7 +9,7 @@
 #include "os_trace.h"
 #include "runtime_stats.h"
 
-ready_list_t ready_list[MAX_PRIORITY];
+list_t ready_list[MAX_PRIORITY];
 uint32_t top_ready_priority_bitmap = 0;
 
 TCB_t *current_tcb = NULL;
@@ -18,7 +18,7 @@ TCB_t *next_tcb = NULL;
 static uint32_t scheduler_lock_count = 0;
 static uint8_t scheduler_yield_pending = 0;
 
-void scheduler_init_queues(void)
+void scheduler_init(void)
 {
     for (int i = 0; i < MAX_PRIORITY; i++)
     {
@@ -40,7 +40,7 @@ void scheduler_unlock(void)
 {
     uint32_t irq_state = os_enter_critical();
 
-    if (scheduler_lock_count > 0)
+    if (scheduler_lock_count > 0U)
     {
         scheduler_lock_count--;
     }
@@ -59,89 +59,106 @@ void scheduler_unlock(void)
     }
 }
 
-void add_task_to_ready_queue(TCB_t *p)
+void add_task_to_ready_queue(TCB_t *task)
 {
-    if (p == NULL)
+    uint32_t irq_state;
+    uint8_t priority;
+
+    if (task == NULL)
     {
         return;
     }
 
-    if (p->state == TASK_READY ||
-        p->state == TASK_UNUSED ||
-        p->state == TASK_TERMINATED)
+    irq_state = os_enter_critical();
+
+    if (task->state == TASK_READY ||
+        task->state == TASK_UNUSED ||
+        task->state == TASK_TERMINATED)
     {
+        os_exit_critical(irq_state);
         return;
     }
 
-    uint8_t prio = p->sched.priority;
-    if (prio >= MAX_PRIORITY)
+    priority = task->sched.priority;
+    if (priority >= MAX_PRIORITY)
     {
-        prio = MAX_PRIORITY - 1;
+        priority = MAX_PRIORITY - 1;
     }
 
-    p->sched.priority = prio;
-    list_push_ready(&ready_list[prio], p);
-    top_ready_priority_bitmap |= (1UL << prio);
-    p->state = TASK_READY;
+    task->sched.priority = priority;
+    list_push_back(&ready_list[priority], &task->node);
+    top_ready_priority_bitmap |= (1UL << priority);
+    task->state = TASK_READY;
+
+    os_exit_critical(irq_state);
 }
 
-void remove_task_from_ready_queue(TCB_t *p)
+void remove_task_from_ready_queue(TCB_t *task)
 {
-    if (p == NULL)
-    {
+    if (task == NULL) {
         return;
     }
 
-    uint8_t prio = p->sched.priority;
-    if (prio >= MAX_PRIORITY)
-    {
-        prio = MAX_PRIORITY - 1;
+    uint32_t irq_state = os_enter_critical();
+
+    if (task->state != TASK_READY ||
+        task->sched.priority >= MAX_PRIORITY) {
+        os_exit_critical(irq_state);
+        return;
     }
 
-    list_remove_ready(&ready_list[prio], p);
+    uint8_t priority = task->sched.priority;
 
-    if (list_is_empty(&ready_list[prio]))
-    {
-        top_ready_priority_bitmap &= ~(1UL << prio);
+    list_remove(&ready_list[priority], &task->node);
+
+    if (list_is_empty(&ready_list[priority])) {
+        top_ready_priority_bitmap &= ~(1UL << priority);
     }
+
+    os_exit_critical(irq_state);
 }
 
-static uint8_t highest_ready_priority(void)
+static uint32_t highest_ready_priority(void)
 {
-    int highest_prio = 31 - __builtin_clz(top_ready_priority_bitmap);
+    uint32_t highest_prio =
+        31U - (uint32_t)__builtin_clz(top_ready_priority_bitmap);
+
     if (highest_prio >= MAX_PRIORITY)
     {
         highest_prio = MAX_PRIORITY - 1;
     }
 
-    return (uint8_t)highest_prio;
+    return highest_prio;
 }
 
 TCB_t *get_highest_priority_ready_task(void)
 {
-    if (top_ready_priority_bitmap == 0)
-    {
+    uint32_t irq_state = os_enter_critical();
+
+    if (top_ready_priority_bitmap == 0U) {
+        os_exit_critical(irq_state);
         return NULL;
     }
 
-    uint8_t highest_prio = highest_ready_priority();
+    uint32_t priority = highest_ready_priority();
+    list_node_t *node = list_pop_front(&ready_list[priority]);
 
-    list_node_t *node = list_pop_front(&ready_list[highest_prio]);
-    TCB_t *p = node ? list_entry(node, TCB_t, node) : NULL;
-
-    if (list_is_empty(&ready_list[highest_prio]))
-    {
-        top_ready_priority_bitmap &= ~(1UL << highest_prio);
+    if (list_is_empty(&ready_list[priority])) {
+        top_ready_priority_bitmap &= ~(1UL << priority);
     }
 
-    return p;
+    TCB_t *task =
+        node != NULL ? list_entry(node, TCB_t, node) : NULL;
+
+    os_exit_critical(irq_state);
+    return task;
 }
 
 void os_schedule(void)
 {
     uint32_t irq_state = os_enter_critical();
 
-    if (scheduler_lock_count > 0)
+    if (scheduler_lock_count > 0U)
     {
         scheduler_yield_pending = 1;
         os_exit_critical(irq_state);
@@ -158,20 +175,16 @@ void os_schedule(void)
         add_task_to_ready_queue(current_tcb);
     }
 
-    TCB_t *pnext = get_highest_priority_ready_task();
-    if (pnext == NULL)
+    TCB_t *next_task = get_highest_priority_ready_task();
+    if (next_task == NULL)
     {
-        if (current_tcb != NULL && current_tcb->state == TASK_RUNNING)
-        {
-            current_tcb->state = TASK_RUNNING;
-        }
         os_exit_critical(irq_state);
         return;
     }
 
-    pnext->state = TASK_RUNNING;
-    pnext->sched.remaining_ticks = OS_TIME_SLICE_TICKS;
-    next_tcb = pnext;
+    next_task->state = TASK_RUNNING;
+    next_task->sched.remaining_ticks = OS_TIME_SLICE_TICKS;
+    next_tcb = next_task;
 
     if (current_tcb != next_tcb)
     {
@@ -181,7 +194,7 @@ void os_schedule(void)
             MYOS_TRACE(OS_TRACE_TASK_SWITCHED_OUT,
                        current_tcb->tid,
                        current_tcb->state,
-                       pnext->tid);
+                       next_task->tid);
         }
 
         runtime_stats_task_switched_in(next_tcb);
@@ -199,15 +212,15 @@ void os_schedule(void)
 void scheduler_yield_if_needed(void)
 {
 #if OS_USE_PREEMPTION
-    if (current_tcb == NULL || top_ready_priority_bitmap == 0)
+    if (current_tcb == NULL || top_ready_priority_bitmap == 0U)
     {
         return;
     }
 
-    uint8_t highest_prio = highest_ready_priority();
+    uint32_t highest_prio = highest_ready_priority();
     if (highest_prio > current_tcb->sched.priority)
     {
-        if (scheduler_lock_count > 0)
+        if (scheduler_lock_count > 0U)
         {
             scheduler_yield_pending = 1;
         }

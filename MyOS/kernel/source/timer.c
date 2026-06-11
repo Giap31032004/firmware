@@ -1,14 +1,8 @@
-#include "kernel.h"
 #include "critical.h"
 #include "list.h"
-#include "os_trace.h"
-#include "scheduler.h"
-#include "task.h"
 #include "tick.h"
 #include "timer.h"
 
-volatile uint32_t os_tick_count = 0;
-static list_t delay_list;
 static list_t active_timer_list;
 
 static void software_timer_insert_locked(os_timer_t *timer)
@@ -56,7 +50,7 @@ static void software_timer_rearm_locked(os_timer_t *timer,
     software_timer_insert_locked(timer);
 }
 
-static void software_timer_process_expired(void)
+void timer_process_tick(void)
 {
     while (1) {
         os_timer_t *timer;
@@ -104,10 +98,28 @@ static void software_timer_process_expired(void)
     }
 }
 
+uint32_t timer_ticks_until_next_expiry(void)
+{
+    uint32_t ticks;
+    uint32_t irq_state = os_enter_critical();
+
+    if (list_is_empty(&active_timer_list)) {
+        ticks = UINT32_MAX;
+    } else {
+        os_timer_t *timer =
+            list_entry(active_timer_list.head, os_timer_t, node);
+
+        ticks = tick_after_or_equal(os_tick_count, timer->expiry_tick)
+            ? 0U
+            : timer->expiry_tick - os_tick_count;
+    }
+
+    os_exit_critical(irq_state);
+    return ticks;
+}
+
 void timer_init(void)
 {
-    os_tick_count = 0;
-    list_init(&delay_list);
     list_init(&active_timer_list);
 }
 
@@ -200,45 +212,4 @@ void os_timer_reset(os_timer_t *timer)
 uint8_t os_timer_is_active(const os_timer_t *timer)
 {
     return (timer != NULL && timer->active != 0U);
-}
-
-void os_delay(uint32_t ticks)
-{
-    if (ticks == 0) {
-        return;
-    }
-
-    (void)task_block_current_on(&delay_list, TASK_BLOCKED, ticks);
-}
-
-void process_timer_tick(void)
-{
-    os_tick_count++;
-
-    software_timer_process_expired();
-    task_process_timeouts();
-    scheduler_tick();
-
-    if (current_tcb != NULL && current_tcb->state == TASK_RUNNING) {
-        scheduler_yield_if_needed();
-    }
-}
-
-void timer_step_ticks(uint32_t ticks)
-{
-    if (ticks == 0U) {
-        return;
-    }
-
-    os_tick_count += ticks;
-    MYOS_TRACE(OS_TRACE_TICK_STEP,
-               current_tcb != NULL ? current_tcb->tid : UINT32_MAX,
-               ticks,
-               os_tick_count);
-    software_timer_process_expired();
-    task_process_timeouts();
-
-    if (current_tcb != NULL && current_tcb->state == TASK_RUNNING) {
-        scheduler_yield_if_needed();
-    }
 }

@@ -53,7 +53,7 @@ typedef struct TCB {
     scheduler_info_t sched;
     memory_info_t mem;
     task_mpu_t mpu;
-    timer_info_t time;
+    task_time_info_t time;
 
     list_t *wait_list;
     os_status_t wait_result;

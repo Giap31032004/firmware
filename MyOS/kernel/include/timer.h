@@ -25,6 +25,9 @@ typedef struct os_timer {
     uint8_t reload_cancelled;
 } os_timer_t;
 
+void timer_init(void);
+void timer_process_tick(void);
+uint32_t timer_ticks_until_next_expiry(void);
 void os_timer_init(os_timer_t *timer,
                    os_timer_callback_t callback,
                    void *arg);

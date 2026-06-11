@@ -3,12 +3,11 @@
  * Bridge: Hardware → OS kernel
  * ========================================================= */
 
+#include "tick.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* Kernel tick function (implemented in OS kernel layer) */
-extern void kernel_tick(void);
 
 /* =========================================================
  * SysTick Handler

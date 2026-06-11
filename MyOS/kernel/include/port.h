@@ -22,4 +22,14 @@ void port_yield_from_isr(void);
 void port_start_scheduler(uint32_t *first_sp);
 void port_system_reset(void);
 
+/* =========================================================
+ * SYSTEM TICK
+ * ========================================================= */
+
+int port_tick_start_periodic(void);
+void port_tick_stop(void);
+void port_tick_clear_pending(void);
+uint32_t port_tick_start_oneshot(uint32_t ticks);
+uint32_t port_tick_elapsed(uint32_t programmed_ticks);
+
 #endif /* PORT_H */

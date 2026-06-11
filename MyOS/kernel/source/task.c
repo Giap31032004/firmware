@@ -19,6 +19,7 @@
 TCB_t tcb_table[MAX_TASKS]; 
 static int total_tasks = 0; 
 static list_t terminated_list;
+static list_t delay_list;
 static os_status_t task_setup(void (*func)(void),
                               uint32_t tid,
                               uint8_t priority,
@@ -32,7 +33,6 @@ static void prvCleanupTerminatedTasks(void);
 static void task_detach_from_current_list(TCB_t *task);
 static void task_free_stack(TCB_t *task);
 static TCB_t *task_find_highest_priority_waiter(list_t *wait_list);
-extern volatile uint32_t os_tick_count;
 
 static uint32_t task_round_stack_size(uint32_t requested_bytes)
 {
@@ -110,6 +110,7 @@ void task_init(void)
 
     total_tasks = 0;
     list_init(&terminated_list);
+    list_init(&delay_list);
 }
 
 /* ========================================================================
@@ -566,7 +567,16 @@ void task_yield(void)
 
 void task_delay(uint32_t ticks)
 {
-    os_delay(ticks);
+    if (ticks == 0U) {
+        return;
+    }
+
+    (void)task_block_current_on(&delay_list, TASK_BLOCKED, ticks);
+}
+
+void os_delay(uint32_t ticks)
+{
+    task_delay(ticks);
 }
 
 os_status_t task_block_current_on(list_t *wait_list,

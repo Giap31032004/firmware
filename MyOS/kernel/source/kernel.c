@@ -34,11 +34,11 @@ void push_sched_log(uint32_t pid, uint8_t prio) {
 void kernel_init(void) {
     KERNEL_LOG("Booting MyOS Kernel...\r\n");
 
-    os_tick_count = 0;
     runtime_stats_init();
     os_trace_init();
-    scheduler_init_queues();
+    scheduler_init();
     task_init();
+    tick_init();
     timer_init();
     memory_init();
 
