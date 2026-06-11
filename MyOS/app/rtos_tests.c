@@ -1,7 +1,6 @@
 #include <stdint.h>
 
 #include "kernel.h"
-#include "event_group.h"
 #include "heap.h"
 #include "ipc.h"
 #include "scheduler.h"
@@ -20,25 +19,16 @@
 #define RTOS_TEST_MUTEX_PI          6
 #define RTOS_TEST_HEAP_FRAGMENT     7
 #define RTOS_TEST_STACK_OVERFLOW    8
-#define RTOS_TEST_MUTEX_OWNER       9
 #define RTOS_TEST_QUEUE_TIMEOUT     10
-#define RTOS_TEST_KILL_SUSP_MUTEX   11
 #define RTOS_TEST_ISR_SEMAPHORE     12
 #define RTOS_TEST_BINARY_SEMAPHORE  13
 #define RTOS_TEST_COUNTING_SEMAPHORE 14
-#define RTOS_TEST_RECURSIVE_MUTEX   15
-#define RTOS_TEST_EVENT_GROUP       16
 #define RTOS_TEST_SOFTWARE_TIMER    17
-
-#define TEST_EVT_SENSOR_READY       (1U << 0)
-#define TEST_EVT_CONTROL_READY      (1U << 1)
 
 #define MAYBE_UNUSED __attribute__((unused))
 
 static os_sem_t test_sem MAYBE_UNUSED;
 static os_mutex_t test_mutex MAYBE_UNUSED;
-static os_mutex_t test_mutex_b MAYBE_UNUSED;
-static os_event_group_t test_events MAYBE_UNUSED;
 static os_msg_queue_t test_queue MAYBE_UNUSED;
 static os_timer_t test_oneshot_timer MAYBE_UNUSED;
 static os_timer_t test_periodic_timer MAYBE_UNUSED;
@@ -55,12 +45,6 @@ static volatile uint32_t low_unlocked MAYBE_UNUSED;
 static volatile uint32_t high_acquired MAYBE_UNUSED;
 static volatile uint32_t high_waiting MAYBE_UNUSED;
 static volatile uint32_t medium_count MAYBE_UNUSED;
-static volatile uint32_t owner_tid MAYBE_UNUSED;
-static volatile uint32_t owner_locked MAYBE_UNUSED;
-static volatile uint32_t owner_resume_seen MAYBE_UNUSED;
-static volatile uint32_t owner_unlocked MAYBE_UNUSED;
-static volatile os_status_t observed_status MAYBE_UNUSED;
-static volatile uint32_t observed_bits MAYBE_UNUSED;
 static volatile uint32_t timer_oneshot_count MAYBE_UNUSED;
 static volatile uint32_t timer_periodic_count MAYBE_UNUSED;
 
@@ -370,46 +354,6 @@ static void stack_overflow_task(void)
 }
 #endif
 
-#if MYOS_TEST_SCENARIO == RTOS_TEST_MUTEX_OWNER
-static void mutex_owner_a(void)
-{
-    os_status_t first = mutex_lock_timeout(&test_mutex, 0);
-    os_status_t second = mutex_lock_timeout(&test_mutex, 0);
-
-    print_u32("[RTOS_TEST] recursive_first=", (uint32_t)first);
-    print_u32(" second=", (uint32_t)second);
-    print_u32(" lock_count=", test_mutex.lock_count);
-    uart_print("\r\n");
-
-    owner_locked = (first == OS_OK &&
-                    second == OS_OK &&
-                    test_mutex.owner == current_tcb &&
-                    test_mutex.lock_count == 2U);
-    task_delay(20);
-    mutex_unlock(&test_mutex);
-    mutex_unlock(&test_mutex);
-    idle_forever();
-}
-
-static void mutex_owner_b(void)
-{
-    task_delay(5);
-    mutex_unlock(&test_mutex);
-    observed_status = mutex_lock_timeout(&test_mutex, 0);
-
-    print_u32("[RTOS_TEST] wrong_owner_lock_result=", (uint32_t)observed_status);
-    print_u32(" lock_count=", test_mutex.lock_count);
-    uart_print("\r\n");
-
-    finish_test(owner_locked != 0U &&
-                observed_status == OS_TIMEOUT &&
-                test_mutex.owner != current_tcb &&
-                test_mutex.lock_count == 2U,
-                "mutex_recursive_owner");
-    idle_forever();
-}
-#endif
-
 #if MYOS_TEST_SCENARIO == RTOS_TEST_QUEUE_TIMEOUT
 static void queue_timeout_task(void)
 {
@@ -452,87 +396,6 @@ static void queue_timeout_task(void)
                 send_delta >= 5U &&
                 recv_delta >= 5U,
                 "queue_timeout");
-    idle_forever();
-}
-#endif
-
-#if MYOS_TEST_SCENARIO == RTOS_TEST_KILL_SUSP_MUTEX
-static void kill_mutex_owner_task(void)
-{
-    mutex_lock(&test_mutex);
-    owner_locked = 1;
-    while (1) {
-        task_delay(1000);
-    }
-}
-
-static void suspend_mutex_owner_task(void)
-{
-    mutex_lock(&test_mutex);
-    owner_locked = 1;
-
-    while (owner_resume_seen == 0U) {
-        task_delay(1);
-    }
-
-    mutex_unlock(&test_mutex);
-    owner_unlocked = 1;
-    idle_forever();
-}
-
-static void kill_suspend_mutex_check_task(void)
-{
-    os_status_t kill_lock_status;
-    os_status_t suspend_wait_status;
-    os_status_t resume_lock_status;
-
-    task_delay(2);
-    owner_tid = find_tid_by_entry(kill_mutex_owner_task);
-    if (owner_locked == 0U || owner_tid == UINT32_MAX) {
-        finish_test(0, "kill_suspend_mutex");
-        idle_forever();
-    }
-
-    task_kill(owner_tid);
-    task_delay(1);
-    kill_lock_status = mutex_lock_timeout(&test_mutex, 2);
-    if (kill_lock_status == OS_OK) {
-        mutex_unlock(&test_mutex);
-    }
-
-    mutex_init(&test_mutex);
-    owner_locked = 0;
-    owner_resume_seen = 0;
-    owner_unlocked = 0;
-
-    task_create(suspend_mutex_owner_task, PRIORITY_NORMAL);
-    task_delay(2);
-    owner_tid = find_tid_by_entry(suspend_mutex_owner_task);
-    if (owner_locked == 0U || owner_tid == UINT32_MAX) {
-        finish_test(0, "kill_suspend_mutex");
-        idle_forever();
-    }
-
-    task_suspend(owner_tid);
-    suspend_wait_status = mutex_lock_timeout(&test_mutex, 3);
-    owner_resume_seen = 1;
-    task_resume(owner_tid);
-    task_delay(3);
-    resume_lock_status = mutex_lock_timeout(&test_mutex, 3);
-    if (resume_lock_status == OS_OK) {
-        mutex_unlock(&test_mutex);
-    }
-
-    print_u32("[RTOS_TEST] kill_lock=", (uint32_t)kill_lock_status);
-    print_u32(" suspend_wait=", (uint32_t)suspend_wait_status);
-    print_u32(" resume_lock=", (uint32_t)resume_lock_status);
-    uart_print("\r\n");
-
-    finish_test(kill_lock_status == OS_OK &&
-                suspend_wait_status == OS_TIMEOUT &&
-                owner_unlocked != 0U &&
-                resume_lock_status == OS_OK,
-                "kill_suspend_mutex");
     idle_forever();
 }
 #endif
@@ -632,88 +495,6 @@ static void counting_sem_task(void)
 }
 #endif
 
-#if MYOS_TEST_SCENARIO == RTOS_TEST_RECURSIVE_MUTEX
-static void recursive_mutex_task(void)
-{
-    os_status_t first;
-    os_status_t second;
-    os_status_t third;
-    uint32_t held_after_locks;
-    uint32_t held_after_one_unlock;
-    uint32_t held_after_b_unlock;
-    uint32_t held_after_all_unlock;
-
-    first = recursive_mutex_lock_timeout(&test_mutex, 0);
-    second = recursive_mutex_lock_timeout(&test_mutex, 0);
-    third = recursive_mutex_lock_timeout(&test_mutex_b, 0);
-    held_after_locks = current_tcb->mutexes_held_count;
-
-    recursive_mutex_unlock(&test_mutex);
-    held_after_one_unlock = current_tcb->mutexes_held_count;
-
-    recursive_mutex_unlock(&test_mutex_b);
-    held_after_b_unlock = current_tcb->mutexes_held_count;
-
-    recursive_mutex_unlock(&test_mutex);
-    held_after_all_unlock = current_tcb->mutexes_held_count;
-
-    print_u32("[RTOS_TEST] recursive_held_locks=", held_after_locks);
-    print_u32(" after_one=", held_after_one_unlock);
-    print_u32(" after_b=", held_after_b_unlock);
-    print_u32(" after_all=", held_after_all_unlock);
-    uart_print("\r\n");
-
-    finish_test(first == OS_OK &&
-                second == OS_OK &&
-                third == OS_OK &&
-                test_mutex.lock_count == 0U &&
-                test_mutex_b.lock_count == 0U &&
-                held_after_locks == 2U &&
-                held_after_one_unlock == 2U &&
-                held_after_b_unlock == 1U &&
-                held_after_all_unlock == 0U,
-                "recursive_mutex");
-    idle_forever();
-}
-#endif
-
-#if MYOS_TEST_SCENARIO == RTOS_TEST_EVENT_GROUP
-static void event_group_waiter_task(void)
-{
-    observed_bits = event_group_wait_bits(&test_events,
-                                          TEST_EVT_SENSOR_READY |
-                                              TEST_EVT_CONTROL_READY,
-                                          1,
-                                          1,
-                                          20);
-
-    print_u32("[RTOS_TEST] event_bits=", observed_bits);
-    print_u32(" remaining=", event_group_get_bits(&test_events));
-    uart_print("\r\n");
-
-    finish_test((observed_bits & (TEST_EVT_SENSOR_READY |
-                                  TEST_EVT_CONTROL_READY)) ==
-                    (TEST_EVT_SENSOR_READY | TEST_EVT_CONTROL_READY) &&
-                    event_group_get_bits(&test_events) == 0U,
-                "event_group");
-    idle_forever();
-}
-
-static void event_group_sensor_task(void)
-{
-    task_delay(2);
-    event_group_set_bits(&test_events, TEST_EVT_SENSOR_READY);
-    idle_forever();
-}
-
-static void event_group_control_task(void)
-{
-    task_delay(4);
-    event_group_set_bits(&test_events, TEST_EVT_CONTROL_READY);
-    idle_forever();
-}
-#endif
-
 #if MYOS_TEST_SCENARIO == RTOS_TEST_SOFTWARE_TIMER
 static void software_timer_oneshot_cb(void *arg)
 {
@@ -776,19 +557,11 @@ void rtos_test_init(void)
     high_acquired = 0;
     high_waiting = 0;
     medium_count = 0;
-    owner_tid = UINT32_MAX;
-    owner_locked = 0;
-    owner_resume_seen = 0;
-    owner_unlocked = 0;
-    observed_status = OS_ERROR;
-    observed_bits = 0U;
     timer_oneshot_count = 0U;
     timer_periodic_count = 0U;
 
     binary_sem_init(&test_sem, 0);
     mutex_init(&test_mutex);
-    mutex_init(&test_mutex_b);
-    event_group_init(&test_events);
     if (msg_queue_init(&test_queue, MAX_MESSAGE_COUNT, sizeof(int32_t)) != OS_OK) {
         finish_test(0, "queue_init");
         return;
@@ -822,14 +595,8 @@ void rtos_test_init(void)
 #elif MYOS_TEST_SCENARIO == RTOS_TEST_STACK_OVERFLOW
     task_create_dynamic(stack_overflow_task, PRIORITY_NORMAL,
                         OS_MIN_STACK_WORDS, NULL);
-#elif MYOS_TEST_SCENARIO == RTOS_TEST_MUTEX_OWNER
-    task_create(mutex_owner_a, PRIORITY_NORMAL);
-    task_create(mutex_owner_b, PRIORITY_HIGH);
 #elif MYOS_TEST_SCENARIO == RTOS_TEST_QUEUE_TIMEOUT
     task_create(queue_timeout_task, PRIORITY_NORMAL);
-#elif MYOS_TEST_SCENARIO == RTOS_TEST_KILL_SUSP_MUTEX
-    task_create(kill_mutex_owner_task, PRIORITY_NORMAL);
-    task_create(kill_suspend_mutex_check_task, PRIORITY_HIGH);
 #elif MYOS_TEST_SCENARIO == RTOS_TEST_ISR_SEMAPHORE
     task_create(isr_sem_waiter_task, PRIORITY_NORMAL);
     task_create(isr_sem_signal_task, PRIORITY_HIGH);
@@ -837,12 +604,6 @@ void rtos_test_init(void)
     task_create(binary_sem_cap_task, PRIORITY_NORMAL);
 #elif MYOS_TEST_SCENARIO == RTOS_TEST_COUNTING_SEMAPHORE
     task_create(counting_sem_task, PRIORITY_NORMAL);
-#elif MYOS_TEST_SCENARIO == RTOS_TEST_RECURSIVE_MUTEX
-    task_create(recursive_mutex_task, PRIORITY_NORMAL);
-#elif MYOS_TEST_SCENARIO == RTOS_TEST_EVENT_GROUP
-    task_create(event_group_waiter_task, PRIORITY_HIGH);
-    task_create(event_group_sensor_task, PRIORITY_NORMAL);
-    task_create(event_group_control_task, PRIORITY_NORMAL);
 #elif MYOS_TEST_SCENARIO == RTOS_TEST_SOFTWARE_TIMER
     task_create(software_timer_check_task, PRIORITY_NORMAL);
 #else

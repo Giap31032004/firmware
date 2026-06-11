@@ -58,12 +58,6 @@ typedef struct TCB {
     list_t *wait_list;
     os_status_t wait_result;
     uint8_t wait_has_timeout;
-    uint32_t event_wait_bits;
-    uint32_t event_result_bits;
-    uint8_t event_wait_all;
-    uint8_t event_clear_on_exit;
-    uint32_t mutexes_held_count;
-    list_t held_mutexes;
 
 #if defined(OS_GENERATE_RUN_TIME_STATS) && OS_GENERATE_RUN_TIME_STATS == 1
     uint64_t runtime_cycles;
@@ -111,16 +105,8 @@ os_status_t task_clear_mpu_extra(uint32_t tid);
 #define os_task_suspend(tid)    task_suspend((tid))
 #define os_task_resume(tid)     task_resume((tid))
 
-/* ================= TASK STATE MANAGEMENT ================= */
-
-void task_set_state(uint32_t tid, task_state_t state);
 os_status_t os_task_get_info(uint32_t tid, os_task_info_t *info);
 
-void task_set_ready(uint32_t tid);
-void task_set_running(uint32_t tid);
-void task_set_blocked(uint32_t tid);
-void task_set_suspended(uint32_t tid);
-void task_set_terminated(uint32_t tid);
 os_status_t task_block_current_on(list_t *wait_list,
                                   task_state_t wait_state,
                                   uint32_t timeout_ticks);

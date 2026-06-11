@@ -10,11 +10,8 @@ param(
         "mutex-pi",
         "heap-fragmentation",
         "stack-overflow",
-        "mutex-recursive-owner",
         "queue-timeout",
-        "kill-suspend-mutex",
         "isr-semaphore",
-        "event-group",
         "software-timer"
     ),
     [int]$MaxSeconds = 30,
@@ -166,11 +163,8 @@ $scenarios = @{
     "mutex-pi"               = @{ Scenario = 6;  Match = "mutex_priority_inheritance PASS" }
     "heap-fragmentation"     = @{ Scenario = 7;  Match = "heap_fragmentation PASS" }
     "stack-overflow"         = @{ Scenario = 8;  Match = "stack overflow" }
-    "mutex-recursive-owner"  = @{ Scenario = 9;  Match = "mutex_recursive_owner PASS" }
     "queue-timeout"          = @{ Scenario = 10; Match = "queue_timeout PASS" }
-    "kill-suspend-mutex"     = @{ Scenario = 11; Match = "kill_suspend_mutex PASS" }
     "isr-semaphore"          = @{ Scenario = 12; Match = "isr_semaphore PASS" }
-    "event-group"            = @{ Scenario = 16; Match = "event_group PASS" }
     "software-timer"         = @{ Scenario = 17; Match = "software_timer PASS" }
 }
 

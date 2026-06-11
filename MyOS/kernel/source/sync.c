@@ -1,8 +1,9 @@
 #include "sync.h"
+
 #include "critical.h"
+#include "os_trace.h"
 #include "port.h"
 #include "scheduler.h"
-#include "os_trace.h"
 #include "task.h"
 
 static void set_effective_priority(TCB_t *task, uint8_t priority)
@@ -21,26 +22,9 @@ static void set_effective_priority(TCB_t *task, uint8_t priority)
     }
 }
 
-static void inherit_priority_if_needed(os_mutex_t *mtx)
-{
-    if (mtx->owner == NULL || current_tcb == NULL) {
-        return;
-    }
-
-    if (current_tcb->sched.priority <= mtx->owner->sched.priority) {
-        return;
-    }
-
-    set_effective_priority(mtx->owner, current_tcb->sched.priority);
-}
-
 static uint8_t highest_waiter_priority(os_mutex_t *mtx, uint8_t priority)
 {
     list_node_t *node;
-
-    if (mtx == NULL) {
-        return priority;
-    }
 
     list_for_each(node, &mtx->wait_list) {
         TCB_t *waiter = list_entry(node, TCB_t, node);
@@ -53,61 +37,15 @@ static uint8_t highest_waiter_priority(os_mutex_t *mtx, uint8_t priority)
     return priority;
 }
 
-static void recompute_inherited_priority(TCB_t *task)
+static void update_owner_priority(os_mutex_t *mtx)
 {
-    list_node_t *node;
-    uint8_t priority;
-
-    if (task == NULL) {
+    if (mtx == NULL || mtx->owner == NULL) {
         return;
     }
 
-    priority = task->sched.base_priority;
-
-    list_for_each(node, &task->held_mutexes) {
-        os_mutex_t *mtx = list_entry(node, os_mutex_t, owner_node);
-        priority = highest_waiter_priority(mtx, priority);
-    }
-
-    set_effective_priority(task, priority);
-}
-
-static void note_mutex_acquired(TCB_t *task, os_mutex_t *mtx)
-{
-    if (task != NULL && mtx != NULL && mtx->owner_listed == 0U) {
-        list_push_back(&task->held_mutexes, &mtx->owner_node);
-        mtx->owner_listed = 1U;
-        task->mutexes_held_count++;
-    }
-}
-
-static void note_mutex_released(TCB_t *task, os_mutex_t *mtx)
-{
-    if (task != NULL && mtx != NULL && mtx->owner_listed != 0U) {
-        list_remove(&task->held_mutexes, &mtx->owner_node);
-        mtx->owner_listed = 0U;
-
-        if (task->mutexes_held_count == 0U) {
-            return;
-        }
-
-        task->mutexes_held_count--;
-    }
-}
-
-static void recover_mutex_if_owner_dead(os_mutex_t *mtx)
-{
-    if (mtx == NULL || mtx->locked == 0 || mtx->owner == NULL) {
-        return;
-    }
-
-    if (mtx->owner->state == TASK_UNUSED ||
-        mtx->owner->state == TASK_TERMINATED) {
-        note_mutex_released(mtx->owner, mtx);
-        mtx->locked = 0;
-        mtx->owner = NULL;
-        mtx->lock_count = 0;
-    }
+    set_effective_priority(
+        mtx->owner,
+        highest_waiter_priority(mtx, mtx->owner->sched.base_priority));
 }
 
 void sem_init(os_sem_t *sem, int32_t initial_count)
@@ -121,18 +59,16 @@ os_status_t sem_init_counting(os_sem_t *sem,
                               int32_t initial_count,
                               int32_t max_count)
 {
-    if (sem == NULL) {
-        return OS_ERROR;
-    }
-
-    if (max_count <= 0 || initial_count < 0 || initial_count > max_count) {
+    if (sem == NULL ||
+        max_count <= 0 ||
+        initial_count < 0 ||
+        initial_count > max_count) {
         return OS_ERROR;
     }
 
     sem->count = initial_count;
     sem->max_count = max_count;
     queue_init(&sem->wait_list);
-
     return OS_OK;
 }
 
@@ -160,7 +96,7 @@ os_status_t sem_wait_timeout(os_sem_t *sem, uint32_t timeout_ticks)
             return OS_OK;
         }
 
-        if (timeout_ticks == 0) {
+        if (timeout_ticks == 0U) {
             os_exit_critical(irq_state);
             return OS_TIMEOUT;
         }
@@ -170,13 +106,7 @@ os_status_t sem_wait_timeout(os_sem_t *sem, uint32_t timeout_ticks)
         os_status_t result = task_block_current_on(&sem->wait_list,
                                                    TASK_BLOCKED,
                                                    timeout_ticks);
-        if (result == OS_OK) {
-            return OS_OK;
-        }
-
-        if (result != OS_OK || timeout_ticks != OS_WAIT_FOREVER) {
-            return result;
-        }
+        return result;
     }
 }
 
@@ -204,15 +134,14 @@ void sem_signal(os_sem_t *sem)
         return;
     }
 
-    sem->count++;
-    if (sem->count > sem->max_count) {
-        sem->count = sem->max_count;
+    if (sem->count < sem->max_count) {
+        sem->count++;
     }
+
     MYOS_TRACE(OS_TRACE_SEM_SIGNAL,
                current_tcb != NULL ? current_tcb->tid : UINT32_MAX,
                (uint32_t)sem,
                (uint32_t)sem->count);
-
     os_exit_critical(irq_state);
 }
 
@@ -239,12 +168,14 @@ void sem_signal_from_isr(os_sem_t *sem)
         return;
     }
 
-    sem->count++;
-    if (sem->count > sem->max_count) {
-        sem->count = sem->max_count;
+    if (sem->count < sem->max_count) {
+        sem->count++;
     }
-    MYOS_TRACE(OS_TRACE_SEM_SIGNAL, UINT32_MAX, (uint32_t)sem, (uint32_t)sem->count);
 
+    MYOS_TRACE(OS_TRACE_SEM_SIGNAL,
+               UINT32_MAX,
+               (uint32_t)sem,
+               (uint32_t)sem->count);
     os_exit_critical(irq_state);
 }
 
@@ -259,7 +190,6 @@ int32_t sem_get_count(os_sem_t *sem)
     uint32_t irq_state = os_enter_critical();
     count = sem->count;
     os_exit_critical(irq_state);
-
     return count;
 }
 
@@ -271,58 +201,51 @@ void mutex_init(os_mutex_t *mtx)
 
     mtx->locked = 0;
     mtx->owner = NULL;
-    mtx->lock_count = 0;
-    mtx->owner_listed = 0U;
-    list_node_init(&mtx->owner_node);
     queue_init(&mtx->wait_list);
 }
 
 os_status_t mutex_lock_timeout(os_mutex_t *mtx, uint32_t timeout_ticks)
 {
-    if (mtx == NULL) {
+    if (mtx == NULL || port_in_isr()) {
         return OS_ERROR;
     }
 
-    if (port_in_isr()) {
-        return OS_ERROR;
+    /* Before the scheduler starts, UART is the only caller and runs alone. */
+    if (current_tcb == NULL) {
+        return OS_OK;
     }
 
     while (1) {
         uint32_t irq_state = os_enter_critical();
 
-        recover_mutex_if_owner_dead(mtx);
-
         if (mtx->owner == current_tcb) {
-            mtx->lock_count++;
-            MYOS_TRACE(OS_TRACE_MUTEX_LOCK,
-                       current_tcb != NULL ? current_tcb->tid : UINT32_MAX,
-                       (uint32_t)mtx,
-                       (uint32_t)mtx->lock_count);
             os_exit_critical(irq_state);
-            return OS_OK;
+            return OS_ERROR;
         }
 
         if (mtx->locked == 0) {
             mtx->locked = 1;
             mtx->owner = current_tcb;
-            mtx->lock_count = 1;
-            note_mutex_acquired(current_tcb, mtx);
             MYOS_TRACE(OS_TRACE_MUTEX_LOCK,
-                       current_tcb != NULL ? current_tcb->tid : UINT32_MAX,
+                       current_tcb->tid,
                        (uint32_t)mtx,
                        1U);
             os_exit_critical(irq_state);
             return OS_OK;
         }
 
-        if (timeout_ticks == 0) {
+        if (timeout_ticks == 0U) {
             os_exit_critical(irq_state);
             return OS_TIMEOUT;
         }
 
-        inherit_priority_if_needed(mtx);
+        if (current_tcb->sched.priority > mtx->owner->sched.priority) {
+            set_effective_priority(mtx->owner,
+                                   current_tcb->sched.priority);
+        }
+
         MYOS_TRACE(OS_TRACE_MUTEX_WAIT,
-                   current_tcb != NULL ? current_tcb->tid : UINT32_MAX,
+                   current_tcb->tid,
                    (uint32_t)mtx,
                    timeout_ticks);
         os_exit_critical(irq_state);
@@ -330,15 +253,14 @@ os_status_t mutex_lock_timeout(os_mutex_t *mtx, uint32_t timeout_ticks)
         os_status_t result = task_block_current_on(&mtx->wait_list,
                                                    TASK_BLOCKED,
                                                    timeout_ticks);
-        if (result == OS_TIMEOUT || result == OS_ERROR) {
-            uint32_t recompute_irq_state = os_enter_critical();
-            recompute_inherited_priority(mtx->owner);
-            os_exit_critical(recompute_irq_state);
+        if (result != OS_OK) {
+            uint32_t update_irq_state = os_enter_critical();
+            update_owner_priority(mtx);
+            os_exit_critical(update_irq_state);
             return result;
         }
 
         if (mtx->owner == current_tcb) {
-            mtx->lock_count = 1;
             return OS_OK;
         }
     }
@@ -351,68 +273,39 @@ void mutex_lock(os_mutex_t *mtx)
 
 void mutex_unlock(os_mutex_t *mtx)
 {
-    if (mtx == NULL) {
-        return;
-    }
+    TCB_t *old_owner;
+    TCB_t *next_owner = NULL;
 
-    if (port_in_isr()) {
+    if (mtx == NULL || current_tcb == NULL || port_in_isr()) {
         return;
     }
 
     uint32_t irq_state = os_enter_critical();
 
-    if (mtx->owner == current_tcb) {
-        TCB_t *old_owner = mtx->owner;
-        TCB_t *next_owner = NULL;
-
-        if (mtx->lock_count > 1) {
-            mtx->lock_count--;
-            MYOS_TRACE(OS_TRACE_MUTEX_UNLOCK,
-                       current_tcb != NULL ? current_tcb->tid : UINT32_MAX,
-                       (uint32_t)mtx,
-                       (uint32_t)mtx->lock_count);
-            os_exit_critical(irq_state);
-            return;
-        }
-
-        note_mutex_released(old_owner, mtx);
-
-        if (!queue_is_empty(&mtx->wait_list)) {
-            next_owner = task_wake_one(&mtx->wait_list, OS_OK);
-            mtx->locked = 1;
-            mtx->owner = next_owner;
-            mtx->lock_count = 1;
-            note_mutex_acquired(next_owner, mtx);
-        } else {
-            mtx->locked = 0;
-            mtx->owner = NULL;
-            mtx->lock_count = 0;
-        }
-
-        recompute_inherited_priority(old_owner);
-        recompute_inherited_priority(next_owner);
-        MYOS_TRACE(OS_TRACE_MUTEX_UNLOCK,
-                   current_tcb != NULL ? current_tcb->tid : UINT32_MAX,
-                   (uint32_t)mtx,
-                   next_owner != NULL ? next_owner->tid : UINT32_MAX);
+    if (mtx->owner != current_tcb) {
+        os_exit_critical(irq_state);
+        return;
     }
+
+    old_owner = mtx->owner;
+
+    if (!queue_is_empty(&mtx->wait_list)) {
+        next_owner = task_wake_one(&mtx->wait_list, OS_OK);
+        mtx->owner = next_owner;
+        mtx->locked = 1;
+        update_owner_priority(mtx);
+    } else {
+        mtx->owner = NULL;
+        mtx->locked = 0;
+    }
+
+    set_effective_priority(old_owner, old_owner->sched.base_priority);
+
+    MYOS_TRACE(OS_TRACE_MUTEX_UNLOCK,
+               current_tcb->tid,
+               (uint32_t)mtx,
+               next_owner != NULL ? next_owner->tid : UINT32_MAX);
 
     os_exit_critical(irq_state);
     scheduler_yield_if_needed();
-}
-
-os_status_t recursive_mutex_lock_timeout(os_mutex_t *mtx,
-                                         uint32_t timeout_ticks)
-{
-    return mutex_lock_timeout(mtx, timeout_ticks);
-}
-
-void recursive_mutex_lock(os_mutex_t *mtx)
-{
-    (void)recursive_mutex_lock_timeout(mtx, OS_WAIT_FOREVER);
-}
-
-void recursive_mutex_unlock(os_mutex_t *mtx)
-{
-    mutex_unlock(mtx);
 }

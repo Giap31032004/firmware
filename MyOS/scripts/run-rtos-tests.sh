@@ -16,8 +16,7 @@ Usage: bash scripts/run-rtos-tests.sh [options] [test ...]
 
 Tests:
   delay-timeout sem-timeout suspend-delay kill-wait round-robin mutex-pi
-  heap-fragmentation stack-overflow mutex-recursive-owner queue-timeout
-  kill-suspend-mutex isr-semaphore event-group software-timer
+  heap-fragmentation stack-overflow queue-timeout isr-semaphore software-timer
 
 Options:
   -b, --backend NAME      renode or qemu. Default: renode
@@ -72,11 +71,8 @@ if [[ ${#tests[@]} -eq 0 ]]; then
         mutex-pi
         heap-fragmentation
         stack-overflow
-        mutex-recursive-owner
         queue-timeout
-        kill-suspend-mutex
         isr-semaphore
-        event-group
         software-timer
     )
 fi
@@ -91,11 +87,8 @@ scenario_for_test() {
         mutex-pi) printf '6\n' ;;
         heap-fragmentation) printf '7\n' ;;
         stack-overflow) printf '8\n' ;;
-        mutex-recursive-owner) printf '9\n' ;;
         queue-timeout) printf '10\n' ;;
-        kill-suspend-mutex) printf '11\n' ;;
         isr-semaphore) printf '12\n' ;;
-        event-group) printf '16\n' ;;
         software-timer) printf '17\n' ;;
         *)
             echo "Unknown RTOS test '$1'" >&2
@@ -114,11 +107,8 @@ match_for_test() {
         mutex-pi) printf 'mutex_priority_inheritance PASS\n' ;;
         heap-fragmentation) printf 'heap_fragmentation PASS\n' ;;
         stack-overflow) printf 'stack overflow\n' ;;
-        mutex-recursive-owner) printf 'mutex_recursive_owner PASS\n' ;;
         queue-timeout) printf 'queue_timeout PASS\n' ;;
-        kill-suspend-mutex) printf 'kill_suspend_mutex PASS\n' ;;
         isr-semaphore) printf 'isr_semaphore PASS\n' ;;
-        event-group) printf 'event_group PASS\n' ;;
         software-timer) printf 'software_timer PASS\n' ;;
         *)
             echo "Unknown RTOS test '$1'" >&2

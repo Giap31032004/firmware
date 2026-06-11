@@ -26,9 +26,6 @@ int32_t sem_get_count(os_sem_t *sem);
 typedef struct {
     int locked;
     TCB_t *owner;
-    uint32_t lock_count;
-    uint8_t owner_listed;
-    list_node_t owner_node;
     queue_t wait_list;
 } os_mutex_t;
 
@@ -36,10 +33,5 @@ void mutex_init(os_mutex_t *mtx);
 void mutex_lock(os_mutex_t *mtx);
 os_status_t mutex_lock_timeout(os_mutex_t *mtx, uint32_t timeout_ticks);
 void mutex_unlock(os_mutex_t *mtx);
-
-void recursive_mutex_lock(os_mutex_t *mtx);
-os_status_t recursive_mutex_lock_timeout(os_mutex_t *mtx,
-                                         uint32_t timeout_ticks);
-void recursive_mutex_unlock(os_mutex_t *mtx);
 
 #endif /* SYNC_H */

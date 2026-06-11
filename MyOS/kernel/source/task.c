@@ -95,12 +95,6 @@ void task_init(void)
         t->wait_list = NULL;
         t->wait_result = OS_OK;
         t->wait_has_timeout = 0;
-        t->event_wait_bits = 0U;
-        t->event_result_bits = 0U;
-        t->event_wait_all = 0U;
-        t->event_clear_on_exit = 0U;
-        t->mutexes_held_count = 0;
-        list_init(&t->held_mutexes);
 #if defined(OS_GENERATE_RUN_TIME_STATS) && OS_GENERATE_RUN_TIME_STATS == 1
         t->runtime_cycles = 0U;
         t->runtime_last_start = 0U;
@@ -347,12 +341,6 @@ static os_status_t task_setup(void (*func)(void),
     t->wait_list = NULL;
     t->wait_result = OS_OK;
     t->wait_has_timeout = 0;
-    t->event_wait_bits = 0U;
-    t->event_result_bits = 0U;
-    t->event_wait_all = 0U;
-    t->event_clear_on_exit = 0U;
-    t->mutexes_held_count = 0;
-    list_init(&t->held_mutexes);
 #if defined(OS_GENERATE_RUN_TIME_STATS) && OS_GENERATE_RUN_TIME_STATS == 1
     t->runtime_cycles = 0U;
     t->runtime_last_start = 0U;
@@ -385,10 +373,6 @@ static void task_detach_from_current_list(TCB_t *task)
     if (task->wait_list != NULL) {
         list_remove(task->wait_list, &task->node);
         task->wait_list = NULL;
-        task->event_wait_bits = 0U;
-        task->event_result_bits = 0U;
-        task->event_wait_all = 0U;
-        task->event_clear_on_exit = 0U;
         return;
     }
 
@@ -677,10 +661,6 @@ void task_process_timeouts(void)
             task->wait_list = NULL;
             task->wait_result = OS_TIMEOUT;
             task->wait_has_timeout = 0;
-            task->event_wait_bits = 0U;
-            task->event_result_bits = 0U;
-            task->event_wait_all = 0U;
-            task->event_clear_on_exit = 0U;
             MYOS_TRACE(OS_TRACE_TASK_READY, task->tid, (uint32_t)OS_TIMEOUT, 1U);
             add_task_to_ready_queue(task);
         }
@@ -769,34 +749,6 @@ void task_check_all_stacks(void)
 #endif
 }
 
-/* =========================================================
- * READY
- * ========================================================= */
-void task_set_ready(uint32_t tid)
-{
-    if (tid >= MAX_TASKS)
-        return;
-
-    TCB_t *task = &tcb_table[tid];
-
-    uint32_t irq_state = os_enter_critical();
-
-    if (task->state == TASK_UNUSED ||
-        task->state == TASK_TERMINATED ||
-        task->state == TASK_READY) {
-        os_exit_critical(irq_state);
-        return;
-    }
-
-    task_detach_from_current_list(task);
-    task->wait_result = OS_ERROR;
-    task->wait_has_timeout = 0;
-    MYOS_TRACE(OS_TRACE_TASK_READY, tid, 0U, 2U);
-    add_task_to_ready_queue(task);
-
-    os_exit_critical(irq_state);
-}
-
 os_status_t os_task_get_info(uint32_t tid, os_task_info_t *info)
 {
     uint32_t irq_state;
@@ -829,114 +781,6 @@ os_status_t os_task_get_info(uint32_t tid, os_task_info_t *info)
     return OS_OK;
 }
 
-/* =========================================================
- * RUNNING
- * ========================================================= */
-void task_set_running(uint32_t tid)
-{
-    if (tid >= MAX_TASKS)
-        return;
-
-    TCB_t *task = &tcb_table[tid];
-
-    uint32_t irq_state = os_enter_critical();
-
-    if (task->state == TASK_UNUSED || task->state == TASK_TERMINATED) {
-        os_exit_critical(irq_state);
-        return;
-    }
-
-    task_detach_from_current_list(task);
-    task->wait_result = OS_ERROR;
-    task->wait_has_timeout = 0;
-
-    task->state = TASK_RUNNING;
-    current_tcb = task;
-
-    os_exit_critical(irq_state);
-}
-
-/* =========================================================
- * BLOCKED
- * ========================================================= */
-void task_set_blocked(uint32_t tid)
-{
-    if (tid >= MAX_TASKS)
-        return;
-
-    TCB_t *task = &tcb_table[tid];
-
-    uint32_t irq_state = os_enter_critical();
-
-    if (task->state == TASK_UNUSED || task->state == TASK_TERMINATED) {
-        os_exit_critical(irq_state);
-        return;
-    }
-
-    task_detach_from_current_list(task);
-    task->wait_result = OS_ERROR;
-    task->wait_has_timeout = 0;
-    MYOS_TRACE(OS_TRACE_TASK_BLOCK, tid, TASK_BLOCKED, 0U);
-
-    task->state = TASK_BLOCKED;
-
-    os_exit_critical(irq_state);
-}
-/* =========================================================
- * SUSPENDED
- * ========================================================= */
-void task_set_suspended(uint32_t tid)
-{
-    if (tid >= MAX_TASKS)
-        return;
-
-    TCB_t *task = &tcb_table[tid];
-
-    uint32_t irq_state = os_enter_critical();
-
-    if (task->state == TASK_UNUSED || task->state == TASK_TERMINATED) {
-        os_exit_critical(irq_state);
-        return;
-    }
-
-    task_detach_from_current_list(task);
-    task->wait_result = OS_ERROR;
-    task->wait_has_timeout = 0;
-    MYOS_TRACE(OS_TRACE_TASK_SUSPEND, tid, task->state, 1U);
-
-    task->state = TASK_SUSPENDED;
-
-    os_exit_critical(irq_state);
-}
-
-/* =========================================================
- * TERMINATED
- * ========================================================= */
-void task_set_terminated(uint32_t tid)
-{
-    if (tid >= MAX_TASKS)
-        return;
-
-    TCB_t *task = &tcb_table[tid];
-
-    uint32_t irq_state = os_enter_critical();
-
-    if (task->state == TASK_UNUSED || task->state == TASK_TERMINATED) {
-        os_exit_critical(irq_state);
-        return;
-    }
-
-    task_detach_from_current_list(task);
-    task->wait_result = OS_ERROR;
-    task->wait_has_timeout = 0;
-
-    MYOS_TRACE(OS_TRACE_TASK_DELETE, tid, 2U, 0U);
-    task->state = TASK_TERMINATED;
-
-    idle_add_terminated_task(task);
-
-    os_exit_critical(irq_state);
-}
 /* ========================================================================
  * TASK RẢNH RỖI HỆ THỐNG (IDLE TASK & GARBAGE COLLECTOR)
  * ======================================================================== */
@@ -1021,42 +865,5 @@ void prvIdleTask(void)
 #elif defined(OS_ENABLE_LOW_POWER) && OS_ENABLE_LOW_POWER == 1
         __asm volatile ("wfi" ::: "memory");
 #endif
-    }
-}
-
-void task_set_state(uint32_t tid, task_state_t state)
-{
-    if (tid >= MAX_TASKS)
-        return;
-
-    TCB_t *task = &tcb_table[tid];
-
-    if (task->state == TASK_UNUSED)
-        return;
-
-    switch (state) {
-    case TASK_READY:
-        task_set_ready(tid);
-        break;
-
-    case TASK_RUNNING:
-        task_set_running(tid);
-        break;
-
-    case TASK_BLOCKED:
-        task_set_blocked(tid);
-        break;
-
-    case TASK_SUSPENDED:
-        task_set_suspended(tid);
-        break;
-
-    case TASK_TERMINATED:
-        task_set_terminated(tid);
-        break;
-
-    default:
-        task->state = state;
-        break;
     }
 }

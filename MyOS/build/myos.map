@@ -23,7 +23,6 @@ LOAD build/drivers/driver_gpio.o
 LOAD build/drivers/uart.o
 LOAD build/hal/hal_gpio.o
 LOAD build/kernel/source/critical.o
-LOAD build/kernel/source/event_group.o
 LOAD build/kernel/source/heap.o
 LOAD build/kernel/source/ipc.o
 LOAD build/kernel/source/kernel.o
@@ -185,7 +184,7 @@ LOAD build/platform/startup.o
  *(.fini_array*)
                 [!provide]                        PROVIDE (__fini_array_end = .)
 
-.user_text      0x08010000     0x4dfc
+.user_text      0x08010000     0x4450
                 0x08010000                        . = ALIGN (0x4)
  *(.user_text .user_text*)
  *(.text .text*)
@@ -238,262 +237,231 @@ LOAD build/platform/startup.o
  .text          0x08010ea8       0x14 build/kernel/source/critical.o
                 0x08010ea8                os_enter_critical
                 0x08010eb8                os_exit_critical
- .text          0x08010ebc      0x22c build/kernel/source/event_group.o
-                0x08010f44                event_group_init
-                0x08010f54                event_group_get_bits
-                0x08010f68                event_group_set_bits
-                0x08010f9c                event_group_set_bits_from_isr
-                0x08010fd0                event_group_clear_bits
-                0x08010ff4                event_group_wait_bits
- .text          0x080110e8      0x364 build/kernel/source/heap.o
-                0x08011140                memory_init
-                0x080111b8                os_malloc
-                0x08011288                os_free
-                0x080113b8                os_get_free_heap_size
-                0x080113c4                os_get_minimum_ever_free_heap_size
-                0x080113d0                os_get_largest_free_block
-                0x080113dc                os_get_heap_fragmentation_percent
-                0x080113f8                os_get_heap_stats
-                0x08011434                get_free_heap_size
-                0x08011440                get_minimum_ever_free_heap_size
- .text          0x0801144c      0x458 build/kernel/source/ipc.o
-                0x08011598                msg_queue_init
-                0x08011600                msg_queue_send_timeout
-                0x08011604                msg_queue_send_to_back_timeout
-                0x08011608                msg_queue_send_to_front_timeout
-                0x0801160c                msg_queue_send
-                0x08011614                msg_queue_send_to_back
-                0x0801161c                msg_queue_send_to_front
-                0x08011624                msg_queue_receive_timeout
-                0x080116ec                msg_queue_receive
-                0x080116f4                msg_queue_send_from_isr
-                0x080116f8                msg_queue_send_to_back_from_isr
-                0x080116fc                msg_queue_send_to_front_from_isr
-                0x08011700                msg_queue_receive_from_isr
-                0x0801178c                msg_buffer_alloc
-                0x080117b4                msg_buffer_release
-                0x080117cc                msg_queue_send_buffer_timeout
-                0x08011804                msg_queue_receive_buffer_timeout
-                0x08011838                msg_queue_send_buffer_from_isr
-                0x08011870                msg_queue_receive_buffer_from_isr
- .text          0x080118a4      0x108 build/kernel/source/kernel.o
-                0x080118a4                push_sched_log
-                0x080118d4                kernel_panic
-                0x08011950                kernel_init
- .text          0x080119ac       0x9c build/kernel/source/list.o
-                0x080119ac                list_init
-                0x080119b8                list_node_init
-                0x080119c4                list_is_empty
-                0x080119d4                list_push_back
-                0x080119ec                list_pop_front
-                0x08011a14                list_remove
- .text          0x08011a48      0x128 build/kernel/source/low_power.o
-                0x08011a98                os_low_power_can_sleep
-                0x08011a9c                os_low_power_try_sleep
- .text          0x08011b70      0x1a0 build/kernel/source/os_trace.o
-                0x08011b70                os_trace_init
-                0x08011b80                os_trace_record
-                0x08011bfc                os_trace_clear
-                0x08011c18                os_trace_dump
- .text          0x08011d10       0x2c build/kernel/source/queue.o
-                0x08011d10                queue_init
-                0x08011d14                queue_enqueue
-                0x08011d20                queue_dequeue
-                0x08011d2c                queue_remove
-                0x08011d38                queue_is_empty
- .text          0x08011d3c      0x2cc build/kernel/source/runtime_stats.o
-                0x08011d3c                runtime_stats_init
-                0x08011d48                runtime_stats_counter
-                0x08011d84                runtime_stats_task_switched_in
-                0x08011dc8                runtime_stats_task_switched_out
-                0x08011e24                runtime_stats_print
- .text          0x08012008      0x2dc build/kernel/source/scheduler.o
-                0x0801205c                scheduler_init
-                0x08012080                scheduler_lock
-                0x0801209c                add_task_to_ready_queue
-                0x080120a4                remove_task_from_ready_queue
-                0x080120f0                get_highest_priority_ready_task
-                0x0801214c                os_schedule
-                0x080121ec                scheduler_unlock
-                0x08012230                scheduler_yield_if_needed
-                0x08012264                scheduler_tick
-                0x080122a0                os_start
- .text          0x080122e4      0x5e8 build/kernel/source/sync.o
-                0x08012620                sem_init
-                0x0801263c                sem_init_counting
-                0x08012660                binary_sem_init
-                0x08012678                sem_wait_timeout
-                0x080126dc                sem_wait
-                0x080126e4                sem_signal
-                0x08012760                sem_signal_from_isr
-                0x080127dc                sem_get_count
-                0x080127f8                mutex_init
-                0x0801281c                mutex_lock_timeout
-                0x08012840                mutex_lock
-                0x0801285c                mutex_unlock
-                0x08012874                recursive_mutex_lock_timeout
-                0x08012898                recursive_mutex_lock
-                0x080128b4                recursive_mutex_unlock
- *fill*         0x080128cc        0x4 
- .text          0x080128d0      0xd28 build/kernel/source/task.o
-                0x08012c7c                task_init
-                0x08012d10                task_create_dynamic
-                0x08012e18                task_create_static
-                0x08012f20                task_kill
-                0x08013028                task_exit
-                0x0801303c                task_suspend
-                0x080130c8                task_resume
-                0x08013110                task_set_mpu_extra
-                0x08013174                task_clear_mpu_extra
-                0x08013198                task_yield
-                0x0801319c                task_block_current_on
-                0x08013238                os_delay
-                0x0801324c                task_delay
-                0x08013260                task_wake_one
-                0x080132b8                task_process_timeouts
-                0x08013320                task_get_stack_high_water_mark
-                0x08013358                vApplicationStackOverflowHook
-                0x08013388                task_check_stack
-                0x08013400                task_check_all_stacks
-                0x08013428                task_set_ready
-                0x08013434                os_task_get_info
-                0x080134c4                task_set_running
-                0x080134d0                task_set_blocked
-                0x080134dc                task_set_suspended
-                0x080134e8                task_set_terminated
-                0x080134f4                idle_add_terminated_task
-                0x0801351c                vApplicationIdleHook
-                0x08013520                prvIdleTask
-                0x0801359c                task_set_state
- .text          0x080135f8       0x8c build/kernel/source/tick.o
-                0x080135f8                tick_init
-                0x08013604                kernel_tick
-                0x08013638                tick_step
- .text          0x08013684      0x254 build/kernel/source/timer.o
-                0x080136c8                timer_process_tick
-                0x080137a4                timer_ticks_until_next_expiry
-                0x080137f4                timer_init
-                0x08013800                os_timer_init
-                0x08013820                os_timer_start
-                0x08013880                os_timer_stop
-                0x080138bc                os_timer_reset
-                0x080138cc                os_timer_is_active
- .text          0x080138d8       0x80 build/kernel/source/utils.o
-                0x080138d8                task_state_str
-                0x080138f0                my_strcmp
-                0x08013918                my_strncmp
- .text          0x08013958        0x4 build/arch/isr.o
-                0x08013958                SysTick_Handler
- .text          0x0801395c      0x200 build/arch/mpu.o
-                0x0801395c                mpu_encode_size
-                0x0801397c                mpu_init
-                0x08013a58                mpu_switch_task
-                0x08013b48                mpu_disable_extra
- .text          0x08013b5c      0x1c0 build/arch/nvic.o
-                0x08013b5c                nvic_enable_irq
-                0x08013b78                nvic_disable_irq
-                0x08013b94                nvic_set_pending
-                0x08013bd8                nvic_clear_pending
-                0x08013c18                nvic_get_pending
-                0x08013c60                nvic_get_active
-                0x08013c84                nvic_set_irq_priority
-                0x08013cac                nvic_get_irq_priority
-                0x08013cd0                nvic_set_priority
-                0x08013cf8                nvic_get_priority
- .text          0x08013d1c       0xa8 build/arch/port.o
-                0x08013d1c                port_disable_irq
-                0x08013d20                port_enable_irq
-                0x08013d24                port_get_irq_state
-                0x08013d2c                port_set_irq_state
-                0x08013d34                port_in_isr
-                0x08013d40                port_yield
-                0x08013d48                port_yield_from_isr
-                0x08013d50                port_start_scheduler
-                0x08013d94                port_tick_start_periodic
-                0x08013d9c                port_tick_stop
-                0x08013da0                port_tick_clear_pending
-                0x08013da4                port_tick_start_oneshot
-                0x08013da8                port_tick_elapsed
-                0x08013dac                port_system_reset
- .text          0x08013dc4      0x104 build/arch/systick.o
-                0x08013dc4                systick_disable
-                0x08013dd8                systick_clear_pending
-                0x08013de8                systick_max_suppressed_ticks
-                0x08013df0                systick_start_oneshot
-                0x08013e4c                systick_elapsed_ticks
-                0x08013e78                systick_init
- .text          0x08013ec8        0x4 build/platform/hardfault.o
-                0x08013ec8                HardFault_Handler_C
- .text          0x08013ecc       0x84 build/platform/system_stm32f4xx.o
-                0x08013ecc                SystemInit
-                0x08013ee0                SystemCoreClockUpdate
- .text          0x08013f50       0x14 build/boards/source/board.o
-                0x08013f50                board_init
- .text          0x08013f64        0x0 build/boards/source/bsp_gpio.o
- .text          0x08013f64       0x7c build/boards/source/rcc.o
-                0x08013f64                rcc_init
- .text          0x08013fe0       0x40 build/boards/source/scb.o
-                0x08013fe0                scb_init
- .text          0x08014020       0x70 build/arch/context_switch.o
-                0x08014020                PendSV_Handler
-                0x08014064                SVC_Handler
- .text          0x08014090        0x0 build/platform/startup.o
+ .text          0x08010ebc      0x364 build/kernel/source/heap.o
+                0x08010f14                memory_init
+                0x08010f8c                os_malloc
+                0x0801105c                os_free
+                0x0801118c                os_get_free_heap_size
+                0x08011198                os_get_minimum_ever_free_heap_size
+                0x080111a4                os_get_largest_free_block
+                0x080111b0                os_get_heap_fragmentation_percent
+                0x080111cc                os_get_heap_stats
+                0x08011208                get_free_heap_size
+                0x08011214                get_minimum_ever_free_heap_size
+ .text          0x08011220      0x1e4 build/kernel/source/ipc.o
+                0x08011220                msg_queue_init
+                0x08011288                msg_queue_send_timeout
+                0x08011340                msg_queue_send
+                0x08011348                msg_queue_receive_timeout
+                0x080113fc                msg_queue_receive
+ .text          0x08011404      0x108 build/kernel/source/kernel.o
+                0x08011404                push_sched_log
+                0x08011434                kernel_panic
+                0x080114b0                kernel_init
+ .text          0x0801150c       0x9c build/kernel/source/list.o
+                0x0801150c                list_init
+                0x08011518                list_node_init
+                0x08011524                list_is_empty
+                0x08011534                list_push_back
+                0x0801154c                list_pop_front
+                0x08011574                list_remove
+ .text          0x080115a8      0x128 build/kernel/source/low_power.o
+                0x080115f8                os_low_power_can_sleep
+                0x080115fc                os_low_power_try_sleep
+ .text          0x080116d0      0x1a0 build/kernel/source/os_trace.o
+                0x080116d0                os_trace_init
+                0x080116e0                os_trace_record
+                0x0801175c                os_trace_clear
+                0x08011778                os_trace_dump
+ .text          0x08011870       0x2c build/kernel/source/queue.o
+                0x08011870                queue_init
+                0x08011874                queue_enqueue
+                0x08011880                queue_dequeue
+                0x0801188c                queue_remove
+                0x08011898                queue_is_empty
+ .text          0x0801189c      0x2cc build/kernel/source/runtime_stats.o
+                0x0801189c                runtime_stats_init
+                0x080118a8                runtime_stats_counter
+                0x080118e4                runtime_stats_task_switched_in
+                0x08011928                runtime_stats_task_switched_out
+                0x08011984                runtime_stats_print
+ .text          0x08011b68      0x2dc build/kernel/source/scheduler.o
+                0x08011bbc                scheduler_init
+                0x08011be0                scheduler_lock
+                0x08011bfc                add_task_to_ready_queue
+                0x08011c04                remove_task_from_ready_queue
+                0x08011c50                get_highest_priority_ready_task
+                0x08011cac                os_schedule
+                0x08011d4c                scheduler_unlock
+                0x08011d90                scheduler_yield_if_needed
+                0x08011dc4                scheduler_tick
+                0x08011e00                os_start
+ .text          0x08011e44      0x3e4 build/kernel/source/sync.o
+                0x08011e88                sem_init
+                0x08011ea4                sem_init_counting
+                0x08011ec8                binary_sem_init
+                0x08011ee0                sem_wait_timeout
+                0x08011f44                sem_wait
+                0x08011f4c                sem_signal
+                0x08011fc4                sem_signal_from_isr
+                0x0801203c                sem_get_count
+                0x08012058                mutex_init
+                0x08012068                mutex_lock_timeout
+                0x0801214c                mutex_lock
+                0x08012154                mutex_unlock
+ .text          0x08012228      0xa24 build/kernel/source/task.o
+                0x08012368                task_init
+                0x080123ec                task_create_dynamic
+                0x080124f8                task_create_static
+                0x08012600                task_kill
+                0x0801271c                task_exit
+                0x08012730                task_suspend
+                0x080127b0                task_resume
+                0x080127fc                task_set_mpu_extra
+                0x08012860                task_clear_mpu_extra
+                0x08012888                task_yield
+                0x0801288c                task_block_current_on
+                0x08012928                os_delay
+                0x0801293c                task_delay
+                0x08012950                task_wake_one
+                0x080129a8                task_process_timeouts
+                0x08012a08                task_get_stack_high_water_mark
+                0x08012a40                vApplicationStackOverflowHook
+                0x08012a70                task_check_stack
+                0x08012ae8                task_check_all_stacks
+                0x08012b10                os_task_get_info
+                0x08012ba4                idle_add_terminated_task
+                0x08012bcc                vApplicationIdleHook
+                0x08012bd0                prvIdleTask
+ .text          0x08012c4c       0x8c build/kernel/source/tick.o
+                0x08012c4c                tick_init
+                0x08012c58                kernel_tick
+                0x08012c8c                tick_step
+ .text          0x08012cd8      0x254 build/kernel/source/timer.o
+                0x08012d1c                timer_process_tick
+                0x08012df8                timer_ticks_until_next_expiry
+                0x08012e48                timer_init
+                0x08012e54                os_timer_init
+                0x08012e74                os_timer_start
+                0x08012ed4                os_timer_stop
+                0x08012f10                os_timer_reset
+                0x08012f20                os_timer_is_active
+ .text          0x08012f2c       0x80 build/kernel/source/utils.o
+                0x08012f2c                task_state_str
+                0x08012f44                my_strcmp
+                0x08012f6c                my_strncmp
+ .text          0x08012fac        0x4 build/arch/isr.o
+                0x08012fac                SysTick_Handler
+ .text          0x08012fb0      0x200 build/arch/mpu.o
+                0x08012fb0                mpu_encode_size
+                0x08012fd0                mpu_init
+                0x080130ac                mpu_switch_task
+                0x0801319c                mpu_disable_extra
+ .text          0x080131b0      0x1c0 build/arch/nvic.o
+                0x080131b0                nvic_enable_irq
+                0x080131cc                nvic_disable_irq
+                0x080131e8                nvic_set_pending
+                0x0801322c                nvic_clear_pending
+                0x0801326c                nvic_get_pending
+                0x080132b4                nvic_get_active
+                0x080132d8                nvic_set_irq_priority
+                0x08013300                nvic_get_irq_priority
+                0x08013324                nvic_set_priority
+                0x0801334c                nvic_get_priority
+ .text          0x08013370       0xa8 build/arch/port.o
+                0x08013370                port_disable_irq
+                0x08013374                port_enable_irq
+                0x08013378                port_get_irq_state
+                0x08013380                port_set_irq_state
+                0x08013388                port_in_isr
+                0x08013394                port_yield
+                0x0801339c                port_yield_from_isr
+                0x080133a4                port_start_scheduler
+                0x080133e8                port_tick_start_periodic
+                0x080133f0                port_tick_stop
+                0x080133f4                port_tick_clear_pending
+                0x080133f8                port_tick_start_oneshot
+                0x080133fc                port_tick_elapsed
+                0x08013400                port_system_reset
+ .text          0x08013418      0x104 build/arch/systick.o
+                0x08013418                systick_disable
+                0x0801342c                systick_clear_pending
+                0x0801343c                systick_max_suppressed_ticks
+                0x08013444                systick_start_oneshot
+                0x080134a0                systick_elapsed_ticks
+                0x080134cc                systick_init
+ .text          0x0801351c        0x4 build/platform/hardfault.o
+                0x0801351c                HardFault_Handler_C
+ .text          0x08013520       0x84 build/platform/system_stm32f4xx.o
+                0x08013520                SystemInit
+                0x08013534                SystemCoreClockUpdate
+ .text          0x080135a4       0x14 build/boards/source/board.o
+                0x080135a4                board_init
+ .text          0x080135b8        0x0 build/boards/source/bsp_gpio.o
+ .text          0x080135b8       0x7c build/boards/source/rcc.o
+                0x080135b8                rcc_init
+ .text          0x08013634       0x40 build/boards/source/scb.o
+                0x08013634                scb_init
+ .text          0x08013674       0x70 build/arch/context_switch.o
+                0x08013674                PendSV_Handler
+                0x080136b8                SVC_Handler
+ .text          0x080136e4        0x0 build/platform/startup.o
  *(.rodata .rodata*)
  .rodata.str1.4
-                0x08014090      0xc8c build/app/app_global.o
+                0x080136e4      0xc8c build/app/app_global.o
                                 0x329 (size before relaxing)
- .rodata        0x08014d1c        0xc build/app/app_global.o
+ .rodata        0x08014370        0xc build/app/app_global.o
  .rodata.str1.4
-                0x08014d28       0x78 build/app/tasks/sensor.o
- .rodata        0x08014d28       0x10 build/app/tasks/sensor.o
+                0x0801437c       0x78 build/app/tasks/sensor.o
+ .rodata        0x0801437c       0x10 build/app/tasks/sensor.o
  .rodata.str1.4
-                0x08014d38      0x3bb build/app/tasks/shell.o
+                0x0801438c      0x3bb build/app/tasks/shell.o
  .rodata.str1.4
-                0x08014d38       0xb6 build/kernel/source/heap.o
+                0x0801438c       0xb6 build/kernel/source/heap.o
  .rodata.str1.4
-                0x08014d38       0xa3 build/kernel/source/kernel.o
+                0x0801438c       0xa3 build/kernel/source/kernel.o
  .rodata.str1.4
-                0x08014d38      0x146 build/kernel/source/os_trace.o
- .rodata        0x08014d38       0x48 build/kernel/source/os_trace.o
+                0x0801438c      0x146 build/kernel/source/os_trace.o
+ .rodata        0x0801438c       0x48 build/kernel/source/os_trace.o
  .rodata.str1.4
-                0x08014d80       0x93 build/kernel/source/runtime_stats.o
+                0x080143d4       0x93 build/kernel/source/runtime_stats.o
  .rodata.str1.4
-                0x08014d80      0x1ff build/kernel/source/task.o
+                0x080143d4      0x1ff build/kernel/source/task.o
  .rodata.str1.4
-                0x08014d80       0x3d build/kernel/source/utils.o
- .rodata        0x08014d80       0x1c build/kernel/source/utils.o
- .rodata        0x08014d9c       0x48 build/arch/mpu.o
-                0x08014d9c                static_regions
+                0x080143d4       0x3d build/kernel/source/utils.o
+ .rodata        0x080143d4       0x1c build/kernel/source/utils.o
+ .rodata        0x080143f0       0x48 build/arch/mpu.o
+                0x080143f0                static_regions
  .rodata.str1.4
-                0x08014de4       0x20 build/arch/port.o
- .rodata        0x08014de4       0x18 build/platform/system_stm32f4xx.o
-                0x08014de4                AHBPrescTable
-                0x08014df4                APBPrescTable
-                0x080150f4                        . = ALIGN (0x4)
+                0x08014438       0x20 build/arch/port.o
+ .rodata        0x08014438       0x18 build/platform/system_stm32f4xx.o
+                0x08014438                AHBPrescTable
+                0x08014448                APBPrescTable
+                0x08014748                        . = ALIGN (0x4)
                 0x08000260                        _sidata = LOADADDR (.kernel_data)
-                0x08014dfc                        _siuserdata = LOADADDR (.user_data)
+                0x08014450                        _siuserdata = LOADADDR (.user_data)
                 0x08000294                        _siccmram = LOADADDR (.ccmram)
 
-.glue_7         0x08014dfc        0x0
- .glue_7        0x08014dfc        0x0 linker stubs
+.glue_7         0x08014450        0x0
+ .glue_7        0x08014450        0x0 linker stubs
 
-.glue_7t        0x08014dfc        0x0
- .glue_7t       0x08014dfc        0x0 linker stubs
+.glue_7t        0x08014450        0x0
+ .glue_7t       0x08014450        0x0 linker stubs
 
-.vfp11_veneer   0x08014dfc        0x0
- .vfp11_veneer  0x08014dfc        0x0 linker stubs
+.vfp11_veneer   0x08014450        0x0
+ .vfp11_veneer  0x08014450        0x0 linker stubs
 
-.v4_bx          0x08014dfc        0x0
- .v4_bx         0x08014dfc        0x0 linker stubs
+.v4_bx          0x08014450        0x0
+ .v4_bx         0x08014450        0x0 linker stubs
 
-.iplt           0x08014dfc        0x0
- .iplt          0x08014dfc        0x0 build/app/app_global.o
+.iplt           0x08014450        0x0
+ .iplt          0x08014450        0x0 build/app/app_global.o
 
-.igot.plt       0x08014dfc        0x0
- .igot.plt      0x08014dfc        0x0 build/app/app_global.o
+.igot.plt       0x08014450        0x0
+ .igot.plt      0x08014450        0x0 build/app/app_global.o
 
-.rel.dyn        0x08014dfc        0x0
- .rel.iplt      0x08014dfc        0x0 build/app/app_global.o
+.rel.dyn        0x08014450        0x0
+ .rel.iplt      0x08014450        0x0 build/app/app_global.o
 
 .kernel_data    0x20000000       0x34 load address 0x08000260
                 0x20000000                        . = ALIGN (0x4)
@@ -510,7 +478,6 @@ LOAD build/platform/startup.o
  .data          0x20000030        0x0 build/drivers/uart.o
  .data          0x20000030        0x0 build/hal/hal_gpio.o
  .data          0x20000030        0x0 build/kernel/source/critical.o
- .data          0x20000030        0x0 build/kernel/source/event_group.o
  .data          0x20000030        0x0 build/kernel/source/heap.o
  .data          0x20000030        0x0 build/kernel/source/ipc.o
  .data          0x20000030        0x0 build/kernel/source/kernel.o
@@ -542,7 +509,7 @@ LOAD build/platform/startup.o
                 0x20000034                        . = ALIGN (0x4)
                 0x20000034                        _edata = .
 
-.user_data      0x20008000        0x0 load address 0x08014dfc
+.user_data      0x20008000        0x0 load address 0x08014450
                 0x20008000                        . = ALIGN (0x4)
                 0x20008000                        _suserdata = .
  *(.user_data .user_data*)
@@ -556,67 +523,66 @@ LOAD build/platform/startup.o
                 0x10000000                        . = ALIGN (0x4)
                 0x10000000                        _eccmram = .
 
-.kernel_bss     0x20000038      0x8dc
+.kernel_bss     0x20000038      0x7ec
                 0x20000038                        . = ALIGN (0x4)
                 0x20000038                        _sbss = .
  *(.kernel_bss .kernel_bss*)
  *(.bss .bss*)
- .bss           0x20000038       0x74 build/app/app_global.o
+ .bss           0x20000038       0x54 build/app/app_global.o
                 0x20000038                app_mutex
-                0x20000058                temp_queue
- .bss           0x200000ac        0x0 build/app/main.o
- .bss           0x200000ac        0x0 build/app/rtos_tests.o
- .bss           0x200000ac        0x0 build/app/tasks/gpio.o
- .bss           0x200000ac        0x0 build/app/tasks/sensor.o
- .bss           0x200000ac        0x0 build/app/tasks/shell.o
- .bss           0x200000ac        0x0 build/drivers/driver_gpio.o
- .bss           0x200000ac       0xb8 build/drivers/uart.o
-                0x200000ac                uart_rx_semaphore
-                0x200000bc                uart_tx_mutex
- .bss           0x20000164        0x0 build/hal/hal_gpio.o
- .bss           0x20000164        0x0 build/kernel/source/critical.o
- .bss           0x20000164        0x0 build/kernel/source/event_group.o
- .bss           0x20000164       0x24 build/kernel/source/heap.o
- .bss           0x20000188        0x0 build/kernel/source/ipc.o
- .bss           0x20000188       0x84 build/kernel/source/kernel.o
-                0x20000188                log_head
-                0x20000189                log_tail
-                0x2000018c                log_buffer
- .bss           0x2000020c        0x0 build/kernel/source/list.o
- .bss           0x2000020c        0x0 build/kernel/source/low_power.o
- .bss           0x2000020c      0x28c build/kernel/source/os_trace.o
- .bss           0x20000498        0x0 build/kernel/source/queue.o
- .bss           0x20000498        0x4 build/kernel/source/runtime_stats.o
- .bss           0x2000049c       0x51 build/kernel/source/scheduler.o
-                0x2000049c                ready_list
-                0x200004dc                top_ready_priority_bitmap
-                0x200004e0                current_tcb
-                0x200004e4                next_tcb
- .bss           0x200004ed        0x0 build/kernel/source/sync.o
- *fill*         0x200004ed        0x3 
- .bss           0x200004f0      0x414 build/kernel/source/task.o
-                0x200004f0                tcb_table
- .bss           0x20000904        0x4 build/kernel/source/tick.o
-                0x20000904                os_tick_count
- .bss           0x20000908        0x8 build/kernel/source/timer.o
- .bss           0x20000910        0x0 build/kernel/source/utils.o
- .bss           0x20000910        0x0 build/arch/isr.o
- .bss           0x20000910        0x1 build/arch/mpu.o
- .bss           0x20000911        0x0 build/arch/nvic.o
- .bss           0x20000911        0x0 build/arch/port.o
- .bss           0x20000911        0x0 build/arch/systick.o
- .bss           0x20000911        0x0 build/platform/hardfault.o
- .bss           0x20000911        0x0 build/platform/system_stm32f4xx.o
- .bss           0x20000911        0x0 build/boards/source/board.o
- .bss           0x20000911        0x0 build/boards/source/bsp_gpio.o
- .bss           0x20000911        0x0 build/boards/source/rcc.o
- .bss           0x20000911        0x0 build/boards/source/scb.o
- .bss           0x20000911        0x0 build/arch/context_switch.o
- .bss           0x20000911        0x0 build/platform/startup.o
+                0x20000048                temp_queue
+ .bss           0x2000008c        0x0 build/app/main.o
+ .bss           0x2000008c        0x0 build/app/rtos_tests.o
+ .bss           0x2000008c        0x0 build/app/tasks/gpio.o
+ .bss           0x2000008c        0x0 build/app/tasks/sensor.o
+ .bss           0x2000008c        0x0 build/app/tasks/shell.o
+ .bss           0x2000008c        0x0 build/drivers/driver_gpio.o
+ .bss           0x2000008c       0xa8 build/drivers/uart.o
+                0x2000008c                uart_rx_semaphore
+                0x2000009c                uart_tx_mutex
+ .bss           0x20000134        0x0 build/hal/hal_gpio.o
+ .bss           0x20000134        0x0 build/kernel/source/critical.o
+ .bss           0x20000134       0x24 build/kernel/source/heap.o
+ .bss           0x20000158        0x0 build/kernel/source/ipc.o
+ .bss           0x20000158       0x84 build/kernel/source/kernel.o
+                0x20000158                log_head
+                0x20000159                log_tail
+                0x2000015c                log_buffer
+ .bss           0x200001dc        0x0 build/kernel/source/list.o
+ .bss           0x200001dc        0x0 build/kernel/source/low_power.o
+ .bss           0x200001dc      0x28c build/kernel/source/os_trace.o
+ .bss           0x20000468        0x0 build/kernel/source/queue.o
+ .bss           0x20000468        0x4 build/kernel/source/runtime_stats.o
+ .bss           0x2000046c       0x51 build/kernel/source/scheduler.o
+                0x2000046c                ready_list
+                0x200004ac                top_ready_priority_bitmap
+                0x200004b0                current_tcb
+                0x200004b4                next_tcb
+ .bss           0x200004bd        0x0 build/kernel/source/sync.o
+ *fill*         0x200004bd        0x3 
+ .bss           0x200004c0      0x354 build/kernel/source/task.o
+                0x200004c0                tcb_table
+ .bss           0x20000814        0x4 build/kernel/source/tick.o
+                0x20000814                os_tick_count
+ .bss           0x20000818        0x8 build/kernel/source/timer.o
+ .bss           0x20000820        0x0 build/kernel/source/utils.o
+ .bss           0x20000820        0x0 build/arch/isr.o
+ .bss           0x20000820        0x1 build/arch/mpu.o
+ .bss           0x20000821        0x0 build/arch/nvic.o
+ .bss           0x20000821        0x0 build/arch/port.o
+ .bss           0x20000821        0x0 build/arch/systick.o
+ .bss           0x20000821        0x0 build/platform/hardfault.o
+ .bss           0x20000821        0x0 build/platform/system_stm32f4xx.o
+ .bss           0x20000821        0x0 build/boards/source/board.o
+ .bss           0x20000821        0x0 build/boards/source/bsp_gpio.o
+ .bss           0x20000821        0x0 build/boards/source/rcc.o
+ .bss           0x20000821        0x0 build/boards/source/scb.o
+ .bss           0x20000821        0x0 build/arch/context_switch.o
+ .bss           0x20000821        0x0 build/platform/startup.o
  *(COMMON)
-                0x20000914                        . = ALIGN (0x4)
- *fill*         0x20000911        0x3 
-                0x20000914                        _ebss = .
+                0x20000824                        . = ALIGN (0x4)
+ *fill*         0x20000821        0x3 
+                0x20000824                        _ebss = .
 
 .user_bss       0x20008000        0x0
                 0x20008000                        . = ALIGN (0x4)
@@ -624,20 +590,20 @@ LOAD build/platform/startup.o
  *(.user_bss .user_bss*)
                 0x20008000                        . = ALIGN (0x4)
                 0x20008000                        _euserbss = .
-                0x20000914                        PROVIDE (_end = _ebss)
+                0x20000824                        PROVIDE (_end = _ebss)
 
 .kernel_heap_stack
-                0x20000914      0x604
-                0x20000918                        . = ALIGN (0x8)
- *fill*         0x20000914        0x4 
-                0x20000918                        _heap_start = .
-                0x20000b18                        . = (. + _Min_Heap_Size)
- *fill*         0x20000918      0x200 
-                0x20000b18                        _heap_end = .
-                0x20000b18                        _stack_end = .
-                0x20000f18                        . = (. + _Min_Stack_Size)
- *fill*         0x20000b18      0x400 
-                0x20000f18                        . = ALIGN (0x8)
+                0x20000824      0x604
+                0x20000828                        . = ALIGN (0x8)
+ *fill*         0x20000824        0x4 
+                0x20000828                        _heap_start = .
+                0x20000a28                        . = (. + _Min_Heap_Size)
+ *fill*         0x20000828      0x200 
+                0x20000a28                        _heap_end = .
+                0x20000a28                        _stack_end = .
+                0x20000e28                        . = (. + _Min_Stack_Size)
+ *fill*         0x20000a28      0x400 
+                0x20000e28                        . = ALIGN (0x8)
                 0x00000001                        ASSERT (((ORIGIN (KERNEL_RAM) + LENGTH (KERNEL_RAM)) >= _estack), ERROR: KERNEL_RAM overflow — reduce data/bss or increase LENGTH)
                 0x00000001                        ASSERT (((ORIGIN (USER_RAM) + LENGTH (USER_RAM)) >= _euserbss), ERROR: USER_RAM overflow — reduce user data/bss or increase LENGTH)
                 0x00000001                        ASSERT (((ORIGIN (CCMRAM) + LENGTH (CCMRAM)) >= _eccmram), ERROR: CCMRAM overflow)
@@ -645,47 +611,46 @@ LOAD build/platform/startup.o
 OUTPUT(build/myos.elf elf32-littlearm)
 LOAD linker stubs
 
-.debug_info     0x00000000    0x10a87
- .debug_info    0x00000000     0x1ddd build/app/app_global.o
- .debug_info    0x00001ddd       0xd4 build/app/main.o
- .debug_info    0x00001eb1       0x80 build/app/rtos_tests.o
- .debug_info    0x00001f31       0xcd build/app/tasks/gpio.o
- .debug_info    0x00001ffe      0x839 build/app/tasks/sensor.o
- .debug_info    0x00002837      0x851 build/app/tasks/shell.o
- .debug_info    0x00003088      0x38c build/drivers/driver_gpio.o
- .debug_info    0x00003414      0xa3f build/drivers/uart.o
- .debug_info    0x00003e53      0x23a build/hal/hal_gpio.o
- .debug_info    0x0000408d      0x11e build/kernel/source/critical.o
- .debug_info    0x000041ab      0xa81 build/kernel/source/event_group.o
- .debug_info    0x00004c2c      0x968 build/kernel/source/heap.o
- .debug_info    0x00005594     0x17f7 build/kernel/source/ipc.o
- .debug_info    0x00006d8b      0x720 build/kernel/source/kernel.o
- .debug_info    0x000074ab      0x206 build/kernel/source/list.o
- .debug_info    0x000076b1      0x7ac build/kernel/source/low_power.o
- .debug_info    0x00007e5d      0x590 build/kernel/source/os_trace.o
- .debug_info    0x000083ed      0x5d3 build/kernel/source/queue.o
- .debug_info    0x000089c0      0x9e2 build/kernel/source/runtime_stats.o
- .debug_info    0x000093a2      0xb08 build/kernel/source/scheduler.o
- .debug_info    0x00009eaa     0x1590 build/kernel/source/sync.o
- .debug_info    0x0000b43a     0x2594 build/kernel/source/task.o
- .debug_info    0x0000d9ce      0x556 build/kernel/source/tick.o
- .debug_info    0x0000df24      0x8fc build/kernel/source/timer.o
- .debug_info    0x0000e820      0x17a build/kernel/source/utils.o
- .debug_info    0x0000e99a       0x91 build/arch/isr.o
- .debug_info    0x0000ea2b      0x72b build/arch/mpu.o
- .debug_info    0x0000f156      0x58d build/arch/nvic.o
- .debug_info    0x0000f6e3      0x68d build/arch/port.o
- .debug_info    0x0000fd70      0x51e build/arch/systick.o
- .debug_info    0x0001028e       0x39 build/platform/hardfault.o
- .debug_info    0x000102c7      0x506 build/platform/system_stm32f4xx.o
- .debug_info    0x000107cd       0xb0 build/boards/source/board.o
- .debug_info    0x0001087d       0x65 build/boards/source/bsp_gpio.o
- .debug_info    0x000108e2       0xa0 build/boards/source/rcc.o
- .debug_info    0x00010982       0x98 build/boards/source/scb.o
- .debug_info    0x00010a1a       0x24 build/arch/context_switch.o
- .debug_info    0x00010a3e       0x49 build/platform/startup.o
+.debug_info     0x00000000     0xe1c0
+ .debug_info    0x00000000     0x1d67 build/app/app_global.o
+ .debug_info    0x00001d67       0xd4 build/app/main.o
+ .debug_info    0x00001e3b       0x80 build/app/rtos_tests.o
+ .debug_info    0x00001ebb       0xcd build/app/tasks/gpio.o
+ .debug_info    0x00001f88      0x812 build/app/tasks/sensor.o
+ .debug_info    0x0000279a      0x851 build/app/tasks/shell.o
+ .debug_info    0x00002feb      0x38c build/drivers/driver_gpio.o
+ .debug_info    0x00003377      0xa18 build/drivers/uart.o
+ .debug_info    0x00003d8f      0x23a build/hal/hal_gpio.o
+ .debug_info    0x00003fc9      0x11e build/kernel/source/critical.o
+ .debug_info    0x000040e7      0x968 build/kernel/source/heap.o
+ .debug_info    0x00004a4f      0xb03 build/kernel/source/ipc.o
+ .debug_info    0x00005552      0x6d2 build/kernel/source/kernel.o
+ .debug_info    0x00005c24      0x206 build/kernel/source/list.o
+ .debug_info    0x00005e2a      0x75e build/kernel/source/low_power.o
+ .debug_info    0x00006588      0x590 build/kernel/source/os_trace.o
+ .debug_info    0x00006b18      0x585 build/kernel/source/queue.o
+ .debug_info    0x0000709d      0x994 build/kernel/source/runtime_stats.o
+ .debug_info    0x00007a31      0xaba build/kernel/source/scheduler.o
+ .debug_info    0x000084eb      0xfbb build/kernel/source/sync.o
+ .debug_info    0x000094a6     0x1caf build/kernel/source/task.o
+ .debug_info    0x0000b155      0x508 build/kernel/source/tick.o
+ .debug_info    0x0000b65d      0x8fc build/kernel/source/timer.o
+ .debug_info    0x0000bf59      0x17a build/kernel/source/utils.o
+ .debug_info    0x0000c0d3       0x91 build/arch/isr.o
+ .debug_info    0x0000c164      0x72b build/arch/mpu.o
+ .debug_info    0x0000c88f      0x58d build/arch/nvic.o
+ .debug_info    0x0000ce1c      0x68d build/arch/port.o
+ .debug_info    0x0000d4a9      0x51e build/arch/systick.o
+ .debug_info    0x0000d9c7       0x39 build/platform/hardfault.o
+ .debug_info    0x0000da00      0x506 build/platform/system_stm32f4xx.o
+ .debug_info    0x0000df06       0xb0 build/boards/source/board.o
+ .debug_info    0x0000dfb6       0x65 build/boards/source/bsp_gpio.o
+ .debug_info    0x0000e01b       0xa0 build/boards/source/rcc.o
+ .debug_info    0x0000e0bb       0x98 build/boards/source/scb.o
+ .debug_info    0x0000e153       0x24 build/arch/context_switch.o
+ .debug_info    0x0000e177       0x49 build/platform/startup.o
 
-.debug_abbrev   0x00000000     0x4371
+.debug_abbrev   0x00000000     0x3e7d
  .debug_abbrev  0x00000000      0x354 build/app/app_global.o
  .debug_abbrev  0x00000354       0x62 build/app/main.o
  .debug_abbrev  0x000003b6       0x43 build/app/rtos_tests.o
@@ -696,37 +661,36 @@ LOAD linker stubs
  .debug_abbrev  0x0000095f      0x2fa build/drivers/uart.o
  .debug_abbrev  0x00000c59      0x138 build/hal/hal_gpio.o
  .debug_abbrev  0x00000d91       0xf9 build/kernel/source/critical.o
- .debug_abbrev  0x00000e8a      0x29b build/kernel/source/event_group.o
- .debug_abbrev  0x00001125      0x3b6 build/kernel/source/heap.o
- .debug_abbrev  0x000014db      0x426 build/kernel/source/ipc.o
- .debug_abbrev  0x00001901      0x212 build/kernel/source/kernel.o
- .debug_abbrev  0x00001b13      0x147 build/kernel/source/list.o
- .debug_abbrev  0x00001c5a      0x268 build/kernel/source/low_power.o
- .debug_abbrev  0x00001ec2      0x22c build/kernel/source/os_trace.o
- .debug_abbrev  0x000020ee      0x1a1 build/kernel/source/queue.o
- .debug_abbrev  0x0000228f      0x2d5 build/kernel/source/runtime_stats.o
- .debug_abbrev  0x00002564      0x303 build/kernel/source/scheduler.o
- .debug_abbrev  0x00002867      0x44b build/kernel/source/sync.o
- .debug_abbrev  0x00002cb2      0x518 build/kernel/source/task.o
- .debug_abbrev  0x000031ca      0x195 build/kernel/source/tick.o
- .debug_abbrev  0x0000335f      0x306 build/kernel/source/timer.o
- .debug_abbrev  0x00003665       0xc8 build/kernel/source/utils.o
- .debug_abbrev  0x0000372d       0x62 build/arch/isr.o
- .debug_abbrev  0x0000378f      0x2a4 build/arch/mpu.o
- .debug_abbrev  0x00003a33      0x1ea build/arch/nvic.o
- .debug_abbrev  0x00003c1d      0x2ba build/arch/port.o
- .debug_abbrev  0x00003ed7      0x1b7 build/arch/systick.o
- .debug_abbrev  0x0000408e       0x2d build/platform/hardfault.o
- .debug_abbrev  0x000040bb      0x11f build/platform/system_stm32f4xx.o
- .debug_abbrev  0x000041da       0x6c build/boards/source/board.o
- .debug_abbrev  0x00004246       0x26 build/boards/source/bsp_gpio.o
- .debug_abbrev  0x0000426c       0x66 build/boards/source/rcc.o
- .debug_abbrev  0x000042d2       0x65 build/boards/source/scb.o
- .debug_abbrev  0x00004337       0x14 build/arch/context_switch.o
- .debug_abbrev  0x0000434b       0x26 build/platform/startup.o
+ .debug_abbrev  0x00000e8a      0x3b6 build/kernel/source/heap.o
+ .debug_abbrev  0x00001240      0x280 build/kernel/source/ipc.o
+ .debug_abbrev  0x000014c0      0x212 build/kernel/source/kernel.o
+ .debug_abbrev  0x000016d2      0x147 build/kernel/source/list.o
+ .debug_abbrev  0x00001819      0x268 build/kernel/source/low_power.o
+ .debug_abbrev  0x00001a81      0x22c build/kernel/source/os_trace.o
+ .debug_abbrev  0x00001cad      0x1a1 build/kernel/source/queue.o
+ .debug_abbrev  0x00001e4e      0x2d5 build/kernel/source/runtime_stats.o
+ .debug_abbrev  0x00002123      0x303 build/kernel/source/scheduler.o
+ .debug_abbrev  0x00002426      0x3a8 build/kernel/source/sync.o
+ .debug_abbrev  0x000027ce      0x508 build/kernel/source/task.o
+ .debug_abbrev  0x00002cd6      0x195 build/kernel/source/tick.o
+ .debug_abbrev  0x00002e6b      0x306 build/kernel/source/timer.o
+ .debug_abbrev  0x00003171       0xc8 build/kernel/source/utils.o
+ .debug_abbrev  0x00003239       0x62 build/arch/isr.o
+ .debug_abbrev  0x0000329b      0x2a4 build/arch/mpu.o
+ .debug_abbrev  0x0000353f      0x1ea build/arch/nvic.o
+ .debug_abbrev  0x00003729      0x2ba build/arch/port.o
+ .debug_abbrev  0x000039e3      0x1b7 build/arch/systick.o
+ .debug_abbrev  0x00003b9a       0x2d build/platform/hardfault.o
+ .debug_abbrev  0x00003bc7      0x11f build/platform/system_stm32f4xx.o
+ .debug_abbrev  0x00003ce6       0x6c build/boards/source/board.o
+ .debug_abbrev  0x00003d52       0x26 build/boards/source/bsp_gpio.o
+ .debug_abbrev  0x00003d78       0x66 build/boards/source/rcc.o
+ .debug_abbrev  0x00003dde       0x65 build/boards/source/scb.o
+ .debug_abbrev  0x00003e43       0x14 build/arch/context_switch.o
+ .debug_abbrev  0x00003e57       0x26 build/platform/startup.o
 
 .debug_loclists
-                0x00000000     0x6a0e
+                0x00000000     0x4ddb
  .debug_loclists
                 0x00000000      0x6c1 build/app/app_global.o
  .debug_loclists
@@ -742,49 +706,47 @@ LOAD linker stubs
  .debug_loclists
                 0x00000cc8       0x33 build/kernel/source/critical.o
  .debug_loclists
-                0x00000cfb      0x5cf build/kernel/source/event_group.o
+                0x00000cfb      0x556 build/kernel/source/heap.o
  .debug_loclists
-                0x000012ca      0x556 build/kernel/source/heap.o
+                0x00001251      0x438 build/kernel/source/ipc.o
  .debug_loclists
-                0x00001820      0xdbd build/kernel/source/ipc.o
+                0x00001689       0x74 build/kernel/source/kernel.o
  .debug_loclists
-                0x000025dd       0x74 build/kernel/source/kernel.o
+                0x000016fd       0xa0 build/kernel/source/list.o
  .debug_loclists
-                0x00002651       0xa0 build/kernel/source/list.o
+                0x0000179d      0x11b build/kernel/source/low_power.o
  .debug_loclists
-                0x000026f1      0x11b build/kernel/source/low_power.o
+                0x000018b8      0x1fc build/kernel/source/os_trace.o
  .debug_loclists
-                0x0000280c      0x1fc build/kernel/source/os_trace.o
+                0x00001ab4       0xea build/kernel/source/queue.o
  .debug_loclists
-                0x00002a08       0xea build/kernel/source/queue.o
+                0x00001b9e      0x3c3 build/kernel/source/runtime_stats.o
  .debug_loclists
-                0x00002af2      0x3c3 build/kernel/source/runtime_stats.o
+                0x00001f61      0x2cd build/kernel/source/scheduler.o
  .debug_loclists
-                0x00002eb5      0x2cd build/kernel/source/scheduler.o
+                0x0000222e      0x7f7 build/kernel/source/sync.o
  .debug_loclists
-                0x00003182      0xc17 build/kernel/source/sync.o
+                0x00002a25     0x1466 build/kernel/source/task.o
  .debug_loclists
-                0x00003d99     0x1d25 build/kernel/source/task.o
+                0x00003e8b       0x4a build/kernel/source/tick.o
  .debug_loclists
-                0x00005abe       0x4a build/kernel/source/tick.o
+                0x00003ed5      0x3e4 build/kernel/source/timer.o
  .debug_loclists
-                0x00005b08      0x3e4 build/kernel/source/timer.o
+                0x000042b9      0x133 build/kernel/source/utils.o
  .debug_loclists
-                0x00005eec      0x133 build/kernel/source/utils.o
+                0x000043ec      0x28c build/arch/mpu.o
  .debug_loclists
-                0x0000601f      0x28c build/arch/mpu.o
+                0x00004678      0x546 build/arch/nvic.o
  .debug_loclists
-                0x000062ab      0x546 build/arch/nvic.o
+                0x00004bbe       0x74 build/arch/port.o
  .debug_loclists
-                0x000067f1       0x74 build/arch/port.o
+                0x00004c32      0x10e build/arch/systick.o
  .debug_loclists
-                0x00006865      0x10e build/arch/systick.o
+                0x00004d40       0x6a build/platform/system_stm32f4xx.o
  .debug_loclists
-                0x00006973       0x6a build/platform/system_stm32f4xx.o
- .debug_loclists
-                0x000069dd       0x31 build/boards/source/rcc.o
+                0x00004daa       0x31 build/boards/source/rcc.o
 
-.debug_aranges  0x00000000      0x4c0
+.debug_aranges  0x00000000      0x4a0
  .debug_aranges
                 0x00000000       0x20 build/app/app_global.o
  .debug_aranges
@@ -806,64 +768,62 @@ LOAD linker stubs
  .debug_aranges
                 0x00000120       0x20 build/kernel/source/critical.o
  .debug_aranges
-                0x00000140       0x20 build/kernel/source/event_group.o
+                0x00000140       0x20 build/kernel/source/heap.o
  .debug_aranges
-                0x00000160       0x20 build/kernel/source/heap.o
+                0x00000160       0x20 build/kernel/source/ipc.o
  .debug_aranges
-                0x00000180       0x20 build/kernel/source/ipc.o
+                0x00000180       0x20 build/kernel/source/kernel.o
  .debug_aranges
-                0x000001a0       0x20 build/kernel/source/kernel.o
+                0x000001a0       0x20 build/kernel/source/list.o
  .debug_aranges
-                0x000001c0       0x20 build/kernel/source/list.o
+                0x000001c0       0x20 build/kernel/source/low_power.o
  .debug_aranges
-                0x000001e0       0x20 build/kernel/source/low_power.o
+                0x000001e0       0x20 build/kernel/source/os_trace.o
  .debug_aranges
-                0x00000200       0x20 build/kernel/source/os_trace.o
+                0x00000200       0x20 build/kernel/source/queue.o
  .debug_aranges
-                0x00000220       0x20 build/kernel/source/queue.o
+                0x00000220       0x20 build/kernel/source/runtime_stats.o
  .debug_aranges
-                0x00000240       0x20 build/kernel/source/runtime_stats.o
+                0x00000240       0x20 build/kernel/source/scheduler.o
  .debug_aranges
-                0x00000260       0x20 build/kernel/source/scheduler.o
+                0x00000260       0x20 build/kernel/source/sync.o
  .debug_aranges
-                0x00000280       0x20 build/kernel/source/sync.o
+                0x00000280       0x20 build/kernel/source/task.o
  .debug_aranges
-                0x000002a0       0x20 build/kernel/source/task.o
+                0x000002a0       0x20 build/kernel/source/tick.o
  .debug_aranges
-                0x000002c0       0x20 build/kernel/source/tick.o
+                0x000002c0       0x20 build/kernel/source/timer.o
  .debug_aranges
-                0x000002e0       0x20 build/kernel/source/timer.o
+                0x000002e0       0x20 build/kernel/source/utils.o
  .debug_aranges
-                0x00000300       0x20 build/kernel/source/utils.o
+                0x00000300       0x20 build/arch/isr.o
  .debug_aranges
-                0x00000320       0x20 build/arch/isr.o
+                0x00000320       0x20 build/arch/mpu.o
  .debug_aranges
-                0x00000340       0x20 build/arch/mpu.o
+                0x00000340       0x20 build/arch/nvic.o
  .debug_aranges
-                0x00000360       0x20 build/arch/nvic.o
+                0x00000360       0x20 build/arch/port.o
  .debug_aranges
-                0x00000380       0x20 build/arch/port.o
+                0x00000380       0x20 build/arch/systick.o
  .debug_aranges
-                0x000003a0       0x20 build/arch/systick.o
+                0x000003a0       0x20 build/platform/hardfault.o
  .debug_aranges
-                0x000003c0       0x20 build/platform/hardfault.o
+                0x000003c0       0x20 build/platform/system_stm32f4xx.o
  .debug_aranges
-                0x000003e0       0x20 build/platform/system_stm32f4xx.o
+                0x000003e0       0x20 build/boards/source/board.o
  .debug_aranges
-                0x00000400       0x20 build/boards/source/board.o
+                0x00000400       0x18 build/boards/source/bsp_gpio.o
  .debug_aranges
-                0x00000420       0x18 build/boards/source/bsp_gpio.o
+                0x00000418       0x20 build/boards/source/rcc.o
  .debug_aranges
-                0x00000438       0x20 build/boards/source/rcc.o
+                0x00000438       0x20 build/boards/source/scb.o
  .debug_aranges
-                0x00000458       0x20 build/boards/source/scb.o
+                0x00000458       0x20 build/arch/context_switch.o
  .debug_aranges
-                0x00000478       0x20 build/arch/context_switch.o
- .debug_aranges
-                0x00000498       0x28 build/platform/startup.o
+                0x00000478       0x28 build/platform/startup.o
 
 .debug_rnglists
-                0x00000000      0x8f8
+                0x00000000      0x729
  .debug_rnglists
                 0x00000000       0x9a build/app/app_global.o
  .debug_rnglists
@@ -875,35 +835,33 @@ LOAD linker stubs
  .debug_rnglists
                 0x000000f9       0x99 build/drivers/uart.o
  .debug_rnglists
-                0x00000192       0x4b build/kernel/source/event_group.o
+                0x00000192       0xb3 build/kernel/source/heap.o
  .debug_rnglists
-                0x000001dd       0xb3 build/kernel/source/heap.o
+                0x00000245       0x1f build/kernel/source/ipc.o
  .debug_rnglists
-                0x00000290       0x75 build/kernel/source/ipc.o
+                0x00000264       0x1d build/kernel/source/list.o
  .debug_rnglists
-                0x00000305       0x1d build/kernel/source/list.o
+                0x00000281       0x24 build/kernel/source/low_power.o
  .debug_rnglists
-                0x00000322       0x24 build/kernel/source/low_power.o
+                0x000002a5      0x11b build/kernel/source/runtime_stats.o
  .debug_rnglists
-                0x00000346      0x11b build/kernel/source/runtime_stats.o
+                0x000003c0       0x23 build/kernel/source/scheduler.o
  .debug_rnglists
-                0x00000461       0x23 build/kernel/source/scheduler.o
+                0x000003e3       0x6f build/kernel/source/sync.o
  .debug_rnglists
-                0x00000484      0x117 build/kernel/source/sync.o
+                0x00000452      0x19d build/kernel/source/task.o
  .debug_rnglists
-                0x0000059b      0x223 build/kernel/source/task.o
+                0x000005ef       0x4a build/kernel/source/timer.o
  .debug_rnglists
-                0x000007be       0x4a build/kernel/source/timer.o
+                0x00000639       0x88 build/arch/mpu.o
  .debug_rnglists
-                0x00000808       0x88 build/arch/mpu.o
+                0x000006c1       0x22 build/arch/nvic.o
  .debug_rnglists
-                0x00000890       0x22 build/arch/nvic.o
+                0x000006e3       0x2c build/arch/systick.o
  .debug_rnglists
-                0x000008b2       0x2c build/arch/systick.o
- .debug_rnglists
-                0x000008de       0x1a build/platform/startup.o
+                0x0000070f       0x1a build/platform/startup.o
 
-.debug_line     0x00000000     0x7ca2
+.debug_line     0x00000000     0x69d3
  .debug_line    0x00000000      0x7b4 build/app/app_global.o
  .debug_line    0x000007b4       0xb3 build/app/main.o
  .debug_line    0x00000867       0x44 build/app/rtos_tests.o
@@ -914,75 +872,73 @@ LOAD linker stubs
  .debug_line    0x000010b0      0x5f1 build/drivers/uart.o
  .debug_line    0x000016a1       0xec build/hal/hal_gpio.o
  .debug_line    0x0000178d       0xbc build/kernel/source/critical.o
- .debug_line    0x00001849      0x4f5 build/kernel/source/event_group.o
- .debug_line    0x00001d3e      0x65c build/kernel/source/heap.o
- .debug_line    0x0000239a      0x94b build/kernel/source/ipc.o
- .debug_line    0x00002ce5      0x1fb build/kernel/source/kernel.o
- .debug_line    0x00002ee0      0x1fe build/kernel/source/list.o
- .debug_line    0x000030de      0x2b4 build/kernel/source/low_power.o
- .debug_line    0x00003392      0x294 build/kernel/source/os_trace.o
- .debug_line    0x00003626      0x151 build/kernel/source/queue.o
- .debug_line    0x00003777      0x4e8 build/kernel/source/runtime_stats.o
- .debug_line    0x00003c5f      0x568 build/kernel/source/scheduler.o
- .debug_line    0x000041c7      0xa66 build/kernel/source/sync.o
- .debug_line    0x00004c2d     0x15b9 build/kernel/source/task.o
- .debug_line    0x000061e6      0x19c build/kernel/source/tick.o
- .debug_line    0x00006382      0x4ea build/kernel/source/timer.o
- .debug_line    0x0000686c      0x11d build/kernel/source/utils.o
- .debug_line    0x00006989       0x5a build/arch/isr.o
- .debug_line    0x000069e3      0x44c build/arch/mpu.o
- .debug_line    0x00006e2f      0x388 build/arch/nvic.o
- .debug_line    0x000071b7      0x21e build/arch/port.o
- .debug_line    0x000073d5      0x34b build/arch/systick.o
- .debug_line    0x00007720       0x4b build/platform/hardfault.o
- .debug_line    0x0000776b      0x177 build/platform/system_stm32f4xx.o
- .debug_line    0x000078e2       0x9b build/boards/source/board.o
- .debug_line    0x0000797d       0x39 build/boards/source/bsp_gpio.o
- .debug_line    0x000079b6      0x127 build/boards/source/rcc.o
- .debug_line    0x00007add       0xa3 build/boards/source/scb.o
- .debug_line    0x00007b80       0x70 build/arch/context_switch.o
- .debug_line    0x00007bf0       0xb2 build/platform/startup.o
+ .debug_line    0x00001849      0x65c build/kernel/source/heap.o
+ .debug_line    0x00001ea5      0x3e0 build/kernel/source/ipc.o
+ .debug_line    0x00002285      0x1fb build/kernel/source/kernel.o
+ .debug_line    0x00002480      0x1fe build/kernel/source/list.o
+ .debug_line    0x0000267e      0x2b4 build/kernel/source/low_power.o
+ .debug_line    0x00002932      0x294 build/kernel/source/os_trace.o
+ .debug_line    0x00002bc6      0x151 build/kernel/source/queue.o
+ .debug_line    0x00002d17      0x4e8 build/kernel/source/runtime_stats.o
+ .debug_line    0x000031ff      0x568 build/kernel/source/scheduler.o
+ .debug_line    0x00003767      0x6f4 build/kernel/source/sync.o
+ .debug_line    0x00003e5b     0x10bc build/kernel/source/task.o
+ .debug_line    0x00004f17      0x19c build/kernel/source/tick.o
+ .debug_line    0x000050b3      0x4ea build/kernel/source/timer.o
+ .debug_line    0x0000559d      0x11d build/kernel/source/utils.o
+ .debug_line    0x000056ba       0x5a build/arch/isr.o
+ .debug_line    0x00005714      0x44c build/arch/mpu.o
+ .debug_line    0x00005b60      0x388 build/arch/nvic.o
+ .debug_line    0x00005ee8      0x21e build/arch/port.o
+ .debug_line    0x00006106      0x34b build/arch/systick.o
+ .debug_line    0x00006451       0x4b build/platform/hardfault.o
+ .debug_line    0x0000649c      0x177 build/platform/system_stm32f4xx.o
+ .debug_line    0x00006613       0x9b build/boards/source/board.o
+ .debug_line    0x000066ae       0x39 build/boards/source/bsp_gpio.o
+ .debug_line    0x000066e7      0x127 build/boards/source/rcc.o
+ .debug_line    0x0000680e       0xa3 build/boards/source/scb.o
+ .debug_line    0x000068b1       0x70 build/arch/context_switch.o
+ .debug_line    0x00006921       0xb2 build/platform/startup.o
 
-.debug_str      0x00000000     0x2667
- .debug_str     0x00000000     0x2667 build/app/app_global.o
-                                0x8a8 (size before relaxing)
- .debug_str     0x00002667      0x176 build/app/main.o
- .debug_str     0x00002667      0x150 build/app/rtos_tests.o
- .debug_str     0x00002667      0x17f build/app/tasks/gpio.o
- .debug_str     0x00002667      0x4b6 build/app/tasks/sensor.o
- .debug_str     0x00002667      0x2ed build/app/tasks/shell.o
- .debug_str     0x00002667      0x2de build/drivers/driver_gpio.o
- .debug_str     0x00002667      0x42f build/drivers/uart.o
- .debug_str     0x00002667      0x21b build/hal/hal_gpio.o
- .debug_str     0x00002667      0x1b8 build/kernel/source/critical.o
- .debug_str     0x00002667      0x668 build/kernel/source/event_group.o
- .debug_str     0x00002667      0x500 build/kernel/source/heap.o
- .debug_str     0x00002667      0xa01 build/kernel/source/ipc.o
- .debug_str     0x00002667      0x524 build/kernel/source/kernel.o
- .debug_str     0x00002667      0x171 build/kernel/source/list.o
- .debug_str     0x00002667      0x76c build/kernel/source/low_power.o
- .debug_str     0x00002667      0x438 build/kernel/source/os_trace.o
- .debug_str     0x00002667      0x481 build/kernel/source/queue.o
- .debug_str     0x00002667      0x562 build/kernel/source/runtime_stats.o
- .debug_str     0x00002667      0x7f8 build/kernel/source/scheduler.o
- .debug_str     0x00002667      0x91d build/kernel/source/sync.o
- .debug_str     0x00002667      0xb14 build/kernel/source/task.o
- .debug_str     0x00002667      0x62d build/kernel/source/tick.o
- .debug_str     0x00002667      0x404 build/kernel/source/timer.o
- .debug_str     0x00002667      0x1db build/kernel/source/utils.o
- .debug_str     0x00002667      0x157 build/arch/isr.o
- .debug_str     0x00002667      0x24c build/arch/mpu.o
- .debug_str     0x00002667      0x28c build/arch/nvic.o
- .debug_str     0x00002667      0x3f4 build/arch/port.o
- .debug_str     0x00002667      0x2b3 build/arch/systick.o
- .debug_str     0x00002667       0xd5 build/platform/hardfault.o
- .debug_str     0x00002667      0x315 build/platform/system_stm32f4xx.o
- .debug_str     0x00002667      0x171 build/boards/source/board.o
- .debug_str     0x00002667      0x149 build/boards/source/bsp_gpio.o
- .debug_str     0x00002667      0x15e build/boards/source/rcc.o
- .debug_str     0x00002667      0x162 build/boards/source/scb.o
- .debug_str     0x00002667       0x49 build/arch/context_switch.o
- .debug_str     0x00002667       0x76 build/platform/startup.o
+.debug_str      0x00000000     0x2141
+ .debug_str     0x00000000     0x2141 build/app/app_global.o
+                                0x820 (size before relaxing)
+ .debug_str     0x00002141      0x176 build/app/main.o
+ .debug_str     0x00002141      0x150 build/app/rtos_tests.o
+ .debug_str     0x00002141      0x17f build/app/tasks/gpio.o
+ .debug_str     0x00002141      0x493 build/app/tasks/sensor.o
+ .debug_str     0x00002141      0x2ed build/app/tasks/shell.o
+ .debug_str     0x00002141      0x2de build/drivers/driver_gpio.o
+ .debug_str     0x00002141      0x40c build/drivers/uart.o
+ .debug_str     0x00002141      0x21b build/hal/hal_gpio.o
+ .debug_str     0x00002141      0x1b8 build/kernel/source/critical.o
+ .debug_str     0x00002141      0x500 build/kernel/source/heap.o
+ .debug_str     0x00002141      0x6ec build/kernel/source/ipc.o
+ .debug_str     0x00002141      0x4bf build/kernel/source/kernel.o
+ .debug_str     0x00002141      0x171 build/kernel/source/list.o
+ .debug_str     0x00002141      0x707 build/kernel/source/low_power.o
+ .debug_str     0x00002141      0x438 build/kernel/source/os_trace.o
+ .debug_str     0x00002141      0x41c build/kernel/source/queue.o
+ .debug_str     0x00002141      0x4fd build/kernel/source/runtime_stats.o
+ .debug_str     0x00002141      0x793 build/kernel/source/scheduler.o
+ .debug_str     0x00002141      0x7b9 build/kernel/source/sync.o
+ .debug_str     0x00002141      0xa48 build/kernel/source/task.o
+ .debug_str     0x00002141      0x5c8 build/kernel/source/tick.o
+ .debug_str     0x00002141      0x404 build/kernel/source/timer.o
+ .debug_str     0x00002141      0x1db build/kernel/source/utils.o
+ .debug_str     0x00002141      0x157 build/arch/isr.o
+ .debug_str     0x00002141      0x24c build/arch/mpu.o
+ .debug_str     0x00002141      0x28c build/arch/nvic.o
+ .debug_str     0x00002141      0x3f4 build/arch/port.o
+ .debug_str     0x00002141      0x2b3 build/arch/systick.o
+ .debug_str     0x00002141       0xd5 build/platform/hardfault.o
+ .debug_str     0x00002141      0x315 build/platform/system_stm32f4xx.o
+ .debug_str     0x00002141      0x171 build/boards/source/board.o
+ .debug_str     0x00002141      0x149 build/boards/source/bsp_gpio.o
+ .debug_str     0x00002141      0x15e build/boards/source/rcc.o
+ .debug_str     0x00002141      0x162 build/boards/source/scb.o
+ .debug_str     0x00002141       0x49 build/arch/context_switch.o
+ .debug_str     0x00002141       0x76 build/platform/startup.o
 
 .comment        0x00000000       0x26
  .comment       0x00000000       0x26 build/app/app_global.o
@@ -996,7 +952,6 @@ LOAD linker stubs
  .comment       0x00000026       0x27 build/drivers/uart.o
  .comment       0x00000026       0x27 build/hal/hal_gpio.o
  .comment       0x00000026       0x27 build/kernel/source/critical.o
- .comment       0x00000026       0x27 build/kernel/source/event_group.o
  .comment       0x00000026       0x27 build/kernel/source/heap.o
  .comment       0x00000026       0x27 build/kernel/source/ipc.o
  .comment       0x00000026       0x27 build/kernel/source/kernel.o
@@ -1046,63 +1001,61 @@ LOAD linker stubs
  .ARM.attributes
                 0x000001d4       0x34 build/kernel/source/critical.o
  .ARM.attributes
-                0x00000208       0x34 build/kernel/source/event_group.o
+                0x00000208       0x34 build/kernel/source/heap.o
  .ARM.attributes
-                0x0000023c       0x34 build/kernel/source/heap.o
+                0x0000023c       0x34 build/kernel/source/ipc.o
  .ARM.attributes
-                0x00000270       0x34 build/kernel/source/ipc.o
+                0x00000270       0x34 build/kernel/source/kernel.o
  .ARM.attributes
-                0x000002a4       0x34 build/kernel/source/kernel.o
+                0x000002a4       0x34 build/kernel/source/list.o
  .ARM.attributes
-                0x000002d8       0x34 build/kernel/source/list.o
+                0x000002d8       0x34 build/kernel/source/low_power.o
  .ARM.attributes
-                0x0000030c       0x34 build/kernel/source/low_power.o
+                0x0000030c       0x34 build/kernel/source/os_trace.o
  .ARM.attributes
-                0x00000340       0x34 build/kernel/source/os_trace.o
+                0x00000340       0x34 build/kernel/source/queue.o
  .ARM.attributes
-                0x00000374       0x34 build/kernel/source/queue.o
+                0x00000374       0x34 build/kernel/source/runtime_stats.o
  .ARM.attributes
-                0x000003a8       0x34 build/kernel/source/runtime_stats.o
+                0x000003a8       0x34 build/kernel/source/scheduler.o
  .ARM.attributes
-                0x000003dc       0x34 build/kernel/source/scheduler.o
+                0x000003dc       0x34 build/kernel/source/sync.o
  .ARM.attributes
-                0x00000410       0x34 build/kernel/source/sync.o
+                0x00000410       0x34 build/kernel/source/task.o
  .ARM.attributes
-                0x00000444       0x34 build/kernel/source/task.o
+                0x00000444       0x34 build/kernel/source/tick.o
  .ARM.attributes
-                0x00000478       0x34 build/kernel/source/tick.o
+                0x00000478       0x34 build/kernel/source/timer.o
  .ARM.attributes
-                0x000004ac       0x34 build/kernel/source/timer.o
+                0x000004ac       0x34 build/kernel/source/utils.o
  .ARM.attributes
-                0x000004e0       0x34 build/kernel/source/utils.o
+                0x000004e0       0x34 build/arch/isr.o
  .ARM.attributes
-                0x00000514       0x34 build/arch/isr.o
+                0x00000514       0x34 build/arch/mpu.o
  .ARM.attributes
-                0x00000548       0x34 build/arch/mpu.o
+                0x00000548       0x34 build/arch/nvic.o
  .ARM.attributes
-                0x0000057c       0x34 build/arch/nvic.o
+                0x0000057c       0x34 build/arch/port.o
  .ARM.attributes
-                0x000005b0       0x34 build/arch/port.o
+                0x000005b0       0x34 build/arch/systick.o
  .ARM.attributes
-                0x000005e4       0x34 build/arch/systick.o
+                0x000005e4       0x34 build/platform/hardfault.o
  .ARM.attributes
-                0x00000618       0x34 build/platform/hardfault.o
+                0x00000618       0x34 build/platform/system_stm32f4xx.o
  .ARM.attributes
-                0x0000064c       0x34 build/platform/system_stm32f4xx.o
+                0x0000064c       0x34 build/boards/source/board.o
  .ARM.attributes
-                0x00000680       0x34 build/boards/source/board.o
+                0x00000680       0x34 build/boards/source/bsp_gpio.o
  .ARM.attributes
-                0x000006b4       0x34 build/boards/source/bsp_gpio.o
+                0x000006b4       0x34 build/boards/source/rcc.o
  .ARM.attributes
-                0x000006e8       0x34 build/boards/source/rcc.o
+                0x000006e8       0x34 build/boards/source/scb.o
  .ARM.attributes
-                0x0000071c       0x34 build/boards/source/scb.o
+                0x0000071c       0x25 build/arch/context_switch.o
  .ARM.attributes
-                0x00000750       0x25 build/arch/context_switch.o
- .ARM.attributes
-                0x00000775       0x25 build/platform/startup.o
+                0x00000741       0x25 build/platform/startup.o
 
-.debug_frame    0x00000000     0x1a70
+.debug_frame    0x00000000     0x156c
  .debug_frame   0x00000000      0x1dc build/app/app_global.o
  .debug_frame   0x000001dc       0x28 build/app/main.o
  .debug_frame   0x00000204       0x20 build/app/rtos_tests.o
@@ -1113,31 +1066,30 @@ LOAD linker stubs
  .debug_frame   0x0000033c      0x12c build/drivers/uart.o
  .debug_frame   0x00000468       0x40 build/hal/hal_gpio.o
  .debug_frame   0x000004a8       0x38 build/kernel/source/critical.o
- .debug_frame   0x000004e0       0xd8 build/kernel/source/event_group.o
- .debug_frame   0x000005b8      0x130 build/kernel/source/heap.o
- .debug_frame   0x000006e8      0x270 build/kernel/source/ipc.o
- .debug_frame   0x00000958       0x58 build/kernel/source/kernel.o
- .debug_frame   0x000009b0       0x70 build/kernel/source/list.o
- .debug_frame   0x00000a20       0x70 build/kernel/source/low_power.o
- .debug_frame   0x00000a90       0xa8 build/kernel/source/os_trace.o
- .debug_frame   0x00000b38       0x68 build/kernel/source/queue.o
- .debug_frame   0x00000ba0       0x88 build/kernel/source/runtime_stats.o
- .debug_frame   0x00000c28      0x188 build/kernel/source/scheduler.o
- .debug_frame   0x00000db0      0x2a0 build/kernel/source/sync.o
- .debug_frame   0x00001050      0x4c8 build/kernel/source/task.o
- .debug_frame   0x00001518       0x64 build/kernel/source/tick.o
- .debug_frame   0x0000157c      0x134 build/kernel/source/timer.o
- .debug_frame   0x000016b0       0x4c build/kernel/source/utils.o
- .debug_frame   0x000016fc       0x20 build/arch/isr.o
- .debug_frame   0x0000171c       0x74 build/arch/mpu.o
- .debug_frame   0x00001790       0xb0 build/arch/nvic.o
- .debug_frame   0x00001840       0xf8 build/arch/port.o
- .debug_frame   0x00001938       0x7c build/arch/systick.o
- .debug_frame   0x000019b4       0x20 build/platform/hardfault.o
- .debug_frame   0x000019d4       0x30 build/platform/system_stm32f4xx.o
- .debug_frame   0x00001a04       0x2c build/boards/source/board.o
- .debug_frame   0x00001a30       0x20 build/boards/source/rcc.o
- .debug_frame   0x00001a50       0x20 build/boards/source/scb.o
+ .debug_frame   0x000004e0      0x130 build/kernel/source/heap.o
+ .debug_frame   0x00000610       0xa0 build/kernel/source/ipc.o
+ .debug_frame   0x000006b0       0x58 build/kernel/source/kernel.o
+ .debug_frame   0x00000708       0x70 build/kernel/source/list.o
+ .debug_frame   0x00000778       0x70 build/kernel/source/low_power.o
+ .debug_frame   0x000007e8       0xa8 build/kernel/source/os_trace.o
+ .debug_frame   0x00000890       0x68 build/kernel/source/queue.o
+ .debug_frame   0x000008f8       0x88 build/kernel/source/runtime_stats.o
+ .debug_frame   0x00000980      0x188 build/kernel/source/scheduler.o
+ .debug_frame   0x00000b08      0x1e4 build/kernel/source/sync.o
+ .debug_frame   0x00000cec      0x328 build/kernel/source/task.o
+ .debug_frame   0x00001014       0x64 build/kernel/source/tick.o
+ .debug_frame   0x00001078      0x134 build/kernel/source/timer.o
+ .debug_frame   0x000011ac       0x4c build/kernel/source/utils.o
+ .debug_frame   0x000011f8       0x20 build/arch/isr.o
+ .debug_frame   0x00001218       0x74 build/arch/mpu.o
+ .debug_frame   0x0000128c       0xb0 build/arch/nvic.o
+ .debug_frame   0x0000133c       0xf8 build/arch/port.o
+ .debug_frame   0x00001434       0x7c build/arch/systick.o
+ .debug_frame   0x000014b0       0x20 build/platform/hardfault.o
+ .debug_frame   0x000014d0       0x30 build/platform/system_stm32f4xx.o
+ .debug_frame   0x00001500       0x2c build/boards/source/board.o
+ .debug_frame   0x0000152c       0x20 build/boards/source/rcc.o
+ .debug_frame   0x0000154c       0x20 build/boards/source/scb.o
 
 .debug_line_str
                 0x00000000       0x50
