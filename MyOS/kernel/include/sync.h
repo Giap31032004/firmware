@@ -2,14 +2,14 @@
 #define SYNC_H
 
 #include "kernel.h"
-#include "queue.h"
+#include "list.h"
 
 typedef struct TCB TCB_t;
 
 typedef struct {
     int32_t count;
     int32_t max_count;
-    queue_t wait_list;
+    list_t wait_list;
 } os_sem_t;
 
 void sem_init(os_sem_t *sem, int32_t initial_count);
@@ -26,7 +26,7 @@ int32_t sem_get_count(os_sem_t *sem);
 typedef struct {
     int locked;
     TCB_t *owner;
-    queue_t wait_list;
+    list_t wait_list;
 } os_mutex_t;
 
 void mutex_init(os_mutex_t *mtx);

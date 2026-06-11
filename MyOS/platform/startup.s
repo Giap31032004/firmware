@@ -37,7 +37,6 @@
 .extern __init_array_start
 .extern __init_array_end
 
-.extern HardFault_Handler_C
 .extern SystemInit
 .extern main
 
@@ -269,39 +268,7 @@ halt_loop:
 .size Reset_Handler, . - Reset_Handler
 
 /* ========================================
-   PHẦN 4: HARDFAULT HANDLER
-   ======================================== */
-.section .kernel_text, "ax", %progbits
-.align 2
-.global HardFault_Handler
-.type   HardFault_Handler, %function
-
-HardFault_Handler:
-    /*
-     * Xác định ngăn xếp nào đang dùng:
-     *   LR bit[2] = 0 → MSP (kernel/handler mode)
-     *   LR bit[2] = 1 → PSP (thread/user mode)
-     */
-    tst  lr, #4
-    ite  eq
-    mrseq r0, msp       /* r0 = frame pointer (MSP) */
-    mrsne r0, psp       /* r0 = frame pointer (PSP) */
-
-    /*
-     * r1 = nguồn ngăn xếp (0 = MSP, 1 = PSP)
-     * Truyền sang HardFault_Handler_C(frame, is_psp)
-     */
-    tst  lr, #4
-    ite  eq
-    moveq r1, #0
-    movne r1, #1
-
-    b    HardFault_Handler_C    /* Không return — đây là điểm cuối */
-
-.size HardFault_Handler, . - HardFault_Handler
-
-/* ========================================
-   PHẦN 5: WEAK ALIAS DEFINITIONS (STM32F407)
+   PHẦN 4: WEAK ALIAS DEFINITIONS (STM32F407)
    ======================================== */
     .macro def_irq_handler handler_name
     .weak \handler_name
@@ -310,6 +277,7 @@ HardFault_Handler:
 
 /* Core Exceptions */
     def_irq_handler NMI_Handler
+    def_irq_handler HardFault_Handler
     def_irq_handler MemManage_Handler
     def_irq_handler BusFault_Handler
     def_irq_handler UsageFault_Handler
@@ -403,7 +371,7 @@ HardFault_Handler:
     def_irq_handler FPU_Handler
 
 /* ========================================
-   PHẦN 6: DEFAULT HANDLER
+   PHẦN 5: DEFAULT HANDLER
    ======================================== */
 .section .kernel_text.Default_Handler, "ax", %progbits
 .align 2

@@ -31,7 +31,6 @@ static os_sem_t test_sem MAYBE_UNUSED;
 static os_mutex_t test_mutex MAYBE_UNUSED;
 static os_msg_queue_t test_queue MAYBE_UNUSED;
 static os_timer_t test_oneshot_timer MAYBE_UNUSED;
-static os_timer_t test_periodic_timer MAYBE_UNUSED;
 static void *heap_blocks[384] MAYBE_UNUSED;
 
 static volatile uint8_t test_done MAYBE_UNUSED;
@@ -46,7 +45,6 @@ static volatile uint32_t high_acquired MAYBE_UNUSED;
 static volatile uint32_t high_waiting MAYBE_UNUSED;
 static volatile uint32_t medium_count MAYBE_UNUSED;
 static volatile uint32_t timer_oneshot_count MAYBE_UNUSED;
-static volatile uint32_t timer_periodic_count MAYBE_UNUSED;
 
 static void MAYBE_UNUSED print_u32(const char *label, uint32_t value)
 {
@@ -502,44 +500,21 @@ static void software_timer_oneshot_cb(void *arg)
     timer_oneshot_count++;
 }
 
-static void software_timer_periodic_cb(void *arg)
-{
-    os_timer_t *timer = (os_timer_t *)arg;
-
-    timer_periodic_count++;
-    if (timer_periodic_count >= 3U) {
-        os_timer_stop(timer);
-    }
-}
-
 static void software_timer_check_task(void)
 {
     os_timer_init(&test_oneshot_timer, software_timer_oneshot_cb, NULL);
-    os_timer_init(&test_periodic_timer,
-                  software_timer_periodic_cb,
-                  &test_periodic_timer);
 
-    if (os_timer_start(&test_oneshot_timer,
-                       3U,
-                       OS_TIMER_ONESHOT) != OS_OK ||
-        os_timer_start(&test_periodic_timer,
-                       2U,
-                       OS_TIMER_PERIODIC) != OS_OK) {
+    if (os_timer_start(&test_oneshot_timer, 3U) != OS_OK) {
         finish_test(0, "software_timer");
         idle_forever();
     }
 
-    task_delay(10);
+    task_delay(5);
 
     print_u32("[RTOS_TEST] oneshot_count=", timer_oneshot_count);
-    print_u32(" periodic_count=", timer_periodic_count);
     uart_print("\r\n");
 
-    finish_test(timer_oneshot_count == 1U &&
-                    timer_periodic_count == 3U &&
-                    os_timer_is_active(&test_oneshot_timer) == 0U &&
-                    os_timer_is_active(&test_periodic_timer) == 0U,
-                "software_timer");
+    finish_test(timer_oneshot_count == 1U, "software_timer");
     idle_forever();
 }
 #endif
@@ -558,7 +533,6 @@ void rtos_test_init(void)
     high_waiting = 0;
     medium_count = 0;
     timer_oneshot_count = 0U;
-    timer_periodic_count = 0U;
 
     binary_sem_init(&test_sem, 0);
     mutex_init(&test_mutex);

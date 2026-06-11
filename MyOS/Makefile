@@ -62,7 +62,6 @@ rwildcard = $(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(
 SEARCH_DIRS = app drivers hal kernel arch platform boards
 
 C_SRCS = $(call rwildcard, $(SEARCH_DIRS), *.c)
-C_SRCS := $(filter-out arch/fault.c,$(C_SRCS))
 ASM_SRCS = $(call rwildcard, $(SEARCH_DIRS), *.s)
 
 # ====================================================================

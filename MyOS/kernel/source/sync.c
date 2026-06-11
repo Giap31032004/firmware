@@ -68,7 +68,7 @@ os_status_t sem_init_counting(os_sem_t *sem,
 
     sem->count = initial_count;
     sem->max_count = max_count;
-    queue_init(&sem->wait_list);
+    list_init(&sem->wait_list);
     return OS_OK;
 }
 
@@ -123,7 +123,7 @@ void sem_signal(os_sem_t *sem)
 
     uint32_t irq_state = os_enter_critical();
 
-    if (!queue_is_empty(&sem->wait_list)) {
+    if (!list_is_empty(&sem->wait_list)) {
         (void)task_wake_one(&sem->wait_list, OS_OK);
         MYOS_TRACE(OS_TRACE_SEM_SIGNAL,
                    current_tcb != NULL ? current_tcb->tid : UINT32_MAX,
@@ -155,7 +155,7 @@ void sem_signal_from_isr(os_sem_t *sem)
 
     uint32_t irq_state = os_enter_critical();
 
-    if (!queue_is_empty(&sem->wait_list)) {
+    if (!list_is_empty(&sem->wait_list)) {
         woken = task_wake_one(&sem->wait_list, OS_OK);
         MYOS_TRACE(OS_TRACE_SEM_SIGNAL, UINT32_MAX, (uint32_t)sem, 1U);
         os_exit_critical(irq_state);
@@ -201,7 +201,7 @@ void mutex_init(os_mutex_t *mtx)
 
     mtx->locked = 0;
     mtx->owner = NULL;
-    queue_init(&mtx->wait_list);
+    list_init(&mtx->wait_list);
 }
 
 os_status_t mutex_lock_timeout(os_mutex_t *mtx, uint32_t timeout_ticks)
@@ -289,7 +289,7 @@ void mutex_unlock(os_mutex_t *mtx)
 
     old_owner = mtx->owner;
 
-    if (!queue_is_empty(&mtx->wait_list)) {
+    if (!list_is_empty(&mtx->wait_list)) {
         next_owner = task_wake_one(&mtx->wait_list, OS_OK);
         mtx->owner = next_owner;
         mtx->locked = 1;
