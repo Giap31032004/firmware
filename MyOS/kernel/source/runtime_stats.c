@@ -3,9 +3,9 @@
 #include "critical.h"
 #include "hardware_config.h"
 #include "kernel_config.h"
+#include "os_log.h"
 #include "runtime_stats.h"
 #include "scheduler.h"
-#include "uart.h"
 #include "utils.h"
 
 #define SYSTICK_BASE    0xE000E010UL
@@ -22,7 +22,7 @@ static void print_percent_x100(uint64_t part, uint64_t total)
     uint32_t pct_x100;
 
     if (total == 0U) {
-        uart_print("0.00");
+        os_log_write("0.00");
         return;
     }
 
@@ -34,7 +34,7 @@ static void print_percent_x100(uint64_t part, uint64_t total)
     part32 = (uint32_t)part;
     total32 = (uint32_t)total;
     if (total32 == 0U) {
-        uart_print("0.00");
+        os_log_write("0.00");
         return;
     }
 
@@ -43,12 +43,12 @@ static void print_percent_x100(uint64_t part, uint64_t total)
     } else {
         pct_x100 = (part32 * 10000U) / total32;
     }
-    uart_print_dec(pct_x100 / 100U);
-    uart_print(".");
+    os_log_write_dec(pct_x100 / 100U);
+    os_log_write(".");
     if ((pct_x100 % 100U) < 10U) {
-        uart_print("0");
+        os_log_write("0");
     }
-    uart_print_dec(pct_x100 % 100U);
+    os_log_write_dec(pct_x100 % 100U);
 }
 
 void runtime_stats_init(void)
@@ -123,26 +123,29 @@ void runtime_stats_print(void)
     }
     os_exit_critical(irq_state);
 
-    uart_print("\r\nTID  STATE       PRIO  RUNTIME_CYCLES  CPU%\r\n");
-    uart_print("------------------------------------------------\r\n");
+    os_log_write("\r\nID  NAME         STATE      PRIO  CPU%     STACK_FREE\r\n");
+    os_log_write("------------------------------------------------------\r\n");
 
     for (uint32_t i = 0; i < MAX_TASKS; i++) {
         if (tcb_table[i].state == TASK_UNUSED) {
             continue;
         }
 
-        uart_print_dec(i);
-        uart_print("    ");
-        uart_print(task_state_str(tcb_table[i].state));
-        uart_print("    ");
-        uart_print_dec(tcb_table[i].sched.priority);
-        uart_print("     ");
-        uart_print_dec((uint32_t)tcb_table[i].runtime_cycles);
-        uart_print("          ");
+        os_log_write_dec(i);
+        os_log_write("   ");
+        os_log_write_column(tcb_table[i].name != NULL
+                                ? tcb_table[i].name
+                                : "task",
+                            13U);
+        os_log_write_column(task_state_str(tcb_table[i].state), 11U);
+        os_log_write_dec(tcb_table[i].sched.priority);
+        os_log_write("     ");
         print_percent_x100(tcb_table[i].runtime_cycles, total);
-        uart_print("\r\n");
+        os_log_write("     ");
+        os_log_write_dec(task_get_stack_high_water_mark(&tcb_table[i]));
+        os_log_write("\r\n");
     }
 #else
-    uart_print("Run-time statistics disabled.\r\n");
+    os_log_write("Run-time statistics disabled.\r\n");
 #endif
 }

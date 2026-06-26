@@ -3,16 +3,17 @@
 #include "critical.h"
 #include "kernel.h"
 #include "kernel_config.h"
+#include "os_log.h"
 #include "os_trace.h"
 #include "runtime_stats.h"
 #include "scheduler.h"
-#include "uart.h"
 
 #if defined(OS_USE_TRACE_FACILITY) && OS_USE_TRACE_FACILITY == 1
 static os_trace_event_t trace_buffer[OS_TRACE_BUFFER_SIZE];
 static volatile uint32_t trace_write_index;
 static volatile uint32_t trace_count;
 static volatile uint32_t trace_dropped;
+static const void *ignored_mutex;
 
 static const char *trace_event_name(uint16_t event)
 {
@@ -55,6 +56,14 @@ void os_trace_record(os_trace_event_id_t event, uint32_t tid, uint32_t arg0, uin
     uint32_t irq_state;
     uint32_t index;
 
+    if (ignored_mutex != NULL &&
+        (event == OS_TRACE_MUTEX_WAIT ||
+         event == OS_TRACE_MUTEX_LOCK ||
+         event == OS_TRACE_MUTEX_UNLOCK) &&
+        arg0 == (uint32_t)ignored_mutex) {
+        return;
+    }
+
     irq_state = os_enter_critical();
 
     index = trace_write_index;
@@ -78,6 +87,24 @@ void os_trace_record(os_trace_event_id_t event, uint32_t tid, uint32_t arg0, uin
     (void)tid;
     (void)arg0;
     (void)arg1;
+#endif
+}
+
+void os_trace_ignore_mutex(const void *mutex)
+{
+#if defined(OS_USE_TRACE_FACILITY) && OS_USE_TRACE_FACILITY == 1
+    ignored_mutex = mutex;
+#else
+    (void)mutex;
+#endif
+}
+
+uint32_t os_trace_get_dropped_count(void)
+{
+#if defined(OS_USE_TRACE_FACILITY) && OS_USE_TRACE_FACILITY == 1
+    return trace_dropped;
+#else
+    return 0U;
 #endif
 }
 
@@ -109,12 +136,12 @@ void os_trace_dump(uint32_t max_events)
     start = (trace_write_index + OS_TRACE_BUFFER_SIZE - count) % OS_TRACE_BUFFER_SIZE;
     os_exit_critical(irq_state);
 
-    uart_print("\r\nTRACE time tick event tid arg0 arg1\r\n");
-    uart_print("-----------------------------------\r\n");
+    os_log_write("\r\nTRACE time tick event tid arg0 arg1\r\n");
+    os_log_write("-----------------------------------\r\n");
     if (dropped != 0U) {
-        uart_print("dropped=");
-        uart_print_dec(dropped);
-        uart_print("\r\n");
+        os_log_write("dropped=");
+        os_log_write_dec(dropped);
+        os_log_write("\r\n");
     }
 
     for (uint32_t i = 0; i < count; i++) {
@@ -125,21 +152,21 @@ void os_trace_dump(uint32_t max_events)
         event = trace_buffer[index];
         os_exit_critical(irq_state);
 
-        uart_print_dec(event.time);
-        uart_print(" ");
-        uart_print_dec(event.tick);
-        uart_print(" ");
-        uart_print(trace_event_name(event.event));
-        uart_print(" ");
-        uart_print_dec(event.tid);
-        uart_print(" ");
-        uart_print_dec(event.arg0);
-        uart_print(" ");
-        uart_print_dec(event.arg1);
-        uart_print("\r\n");
+        os_log_write_dec(event.time);
+        os_log_write(" ");
+        os_log_write_dec(event.tick);
+        os_log_write(" ");
+        os_log_write(trace_event_name(event.event));
+        os_log_write(" ");
+        os_log_write_dec(event.tid);
+        os_log_write(" ");
+        os_log_write_dec(event.arg0);
+        os_log_write(" ");
+        os_log_write_dec(event.arg1);
+        os_log_write("\r\n");
     }
 #else
     (void)max_events;
-    uart_print("RTOS trace disabled.\r\n");
+    os_log_write("RTOS trace disabled.\r\n");
 #endif
 }

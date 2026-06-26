@@ -38,6 +38,8 @@ void os_trace_init(void);
 void os_trace_record(os_trace_event_id_t event, uint32_t tid, uint32_t arg0, uint32_t arg1);
 void os_trace_dump(uint32_t max_events);
 void os_trace_clear(void);
+void os_trace_ignore_mutex(const void *mutex);
+uint32_t os_trace_get_dropped_count(void);
 
 #if defined(OS_USE_TRACE_FACILITY) && OS_USE_TRACE_FACILITY == 1
 #define MYOS_TRACE(event, tid, arg0, arg1) \

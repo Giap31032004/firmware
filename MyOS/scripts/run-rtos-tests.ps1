@@ -12,7 +12,14 @@ param(
         "stack-overflow",
         "queue-timeout",
         "isr-semaphore",
-        "software-timer"
+        "binary-semaphore",
+        "counting-semaphore",
+        "queue-isr",
+        "software-timer",
+        "api-latency",
+        "context-switch",
+        "timer-jitter",
+        "cpu-load"
     ),
     [int]$MaxSeconds = 30,
     [string]$MakeExe = "",
@@ -165,7 +172,14 @@ $scenarios = @{
     "stack-overflow"         = @{ Scenario = 8;  Match = "stack overflow" }
     "queue-timeout"          = @{ Scenario = 10; Match = "queue_timeout PASS" }
     "isr-semaphore"          = @{ Scenario = 12; Match = "isr_semaphore PASS" }
+    "binary-semaphore"       = @{ Scenario = 13; Match = "binary_semaphore PASS" }
+    "counting-semaphore"     = @{ Scenario = 14; Match = "counting_semaphore PASS" }
+    "queue-isr"              = @{ Scenario = 15; Match = "queue_from_isr PASS" }
     "software-timer"         = @{ Scenario = 17; Match = "software_timer PASS" }
+    "api-latency"            = @{ Scenario = 18; Match = "api_latency PASS" }
+    "context-switch"         = @{ Scenario = 19; Match = "context_switch_latency PASS" }
+    "timer-jitter"           = @{ Scenario = 20; Match = "timer_jitter PASS" }
+    "cpu-load"               = @{ Scenario = 21; Match = "cpu_load PASS" }
 }
 
 foreach ($test in $Tests) {

@@ -48,16 +48,9 @@ static void update_owner_priority(os_mutex_t *mtx)
         highest_waiter_priority(mtx, mtx->owner->sched.base_priority));
 }
 
-void sem_init(os_sem_t *sem, int32_t initial_count)
-{
-    int32_t max_count = initial_count > 0 ? initial_count : 1;
-
-    (void)sem_init_counting(sem, initial_count, max_count);
-}
-
-os_status_t sem_init_counting(os_sem_t *sem,
-                              int32_t initial_count,
-                              int32_t max_count)
+os_status_t sem_init(os_sem_t *sem,
+                     int32_t initial_count,
+                     int32_t max_count)
 {
     if (sem == NULL ||
         max_count <= 0 ||
@@ -70,11 +63,6 @@ os_status_t sem_init_counting(os_sem_t *sem,
     sem->max_count = max_count;
     list_init(&sem->wait_list);
     return OS_OK;
-}
-
-void binary_sem_init(os_sem_t *sem, int initially_available)
-{
-    (void)sem_init_counting(sem, initially_available ? 1 : 0, 1);
 }
 
 os_status_t sem_wait_timeout(os_sem_t *sem, uint32_t timeout_ticks)
@@ -108,11 +96,6 @@ os_status_t sem_wait_timeout(os_sem_t *sem, uint32_t timeout_ticks)
                                                    timeout_ticks);
         return result;
     }
-}
-
-void sem_wait(os_sem_t *sem)
-{
-    (void)sem_wait_timeout(sem, OS_WAIT_FOREVER);
 }
 
 void sem_signal(os_sem_t *sem)
@@ -199,7 +182,6 @@ void mutex_init(os_mutex_t *mtx)
         return;
     }
 
-    mtx->locked = 0;
     mtx->owner = NULL;
     list_init(&mtx->wait_list);
 }
@@ -223,8 +205,7 @@ os_status_t mutex_lock_timeout(os_mutex_t *mtx, uint32_t timeout_ticks)
             return OS_ERROR;
         }
 
-        if (mtx->locked == 0) {
-            mtx->locked = 1;
+        if (mtx->owner == NULL) {
             mtx->owner = current_tcb;
             MYOS_TRACE(OS_TRACE_MUTEX_LOCK,
                        current_tcb->tid,
@@ -266,11 +247,6 @@ os_status_t mutex_lock_timeout(os_mutex_t *mtx, uint32_t timeout_ticks)
     }
 }
 
-void mutex_lock(os_mutex_t *mtx)
-{
-    (void)mutex_lock_timeout(mtx, OS_WAIT_FOREVER);
-}
-
 void mutex_unlock(os_mutex_t *mtx)
 {
     TCB_t *old_owner;
@@ -292,11 +268,9 @@ void mutex_unlock(os_mutex_t *mtx)
     if (!list_is_empty(&mtx->wait_list)) {
         next_owner = task_wake_one(&mtx->wait_list, OS_OK);
         mtx->owner = next_owner;
-        mtx->locked = 1;
         update_owner_priority(mtx);
     } else {
         mtx->owner = NULL;
-        mtx->locked = 0;
     }
 
     set_effective_priority(old_owner, old_owner->sched.base_priority);

@@ -1,5 +1,6 @@
 #include "uart.h"
 #include "kernel.h"
+#include "os_trace.h"
 #include "memory_map.h" /* BẮT BUỘC: Đã chứa định nghĩa GPIOA và USART1 */
 #include <stdio.h> 
 
@@ -26,7 +27,8 @@ os_mutex_t uart_tx_mutex;
 void uart_init(void) {
     /* Khởi tạo OS Sync Objects */
     binary_sem_init(&uart_rx_semaphore, 0);
-    mutex_init(&uart_tx_mutex);      
+    mutex_init(&uart_tx_mutex);
+    os_trace_ignore_mutex(&uart_tx_mutex);
 
     /* 1. Bật nguồn (Clock) cho GPIOA và USART1 */
     RCC->AHB1ENR |= (1 << 0);   /* Bit 0: GPIOA EN */
@@ -64,6 +66,14 @@ void uart_putc_raw(char c) {
     while (!(USART1->SR & USART_SR_TXE)); 
     /* Đẩy dữ liệu vào thanh ghi Data Register */
     USART1->DR = c;
+}
+
+void os_log_backend_putc(char c)
+{
+    if (c == '\n') {
+        uart_putc_raw('\r');
+    }
+    uart_putc_raw(c);
 }
 
 /* =============================================================

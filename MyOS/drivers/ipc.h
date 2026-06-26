@@ -22,5 +22,6 @@ void msg_queue_send(os_msg_queue_t *q, const void *item);
 void msg_queue_receive(os_msg_queue_t *q, void *item);
 os_status_t msg_queue_send_timeout(os_msg_queue_t *q, const void *item, uint32_t timeout_ticks);
 os_status_t msg_queue_receive_timeout(os_msg_queue_t *q, void *item, uint32_t timeout_ticks);
+os_status_t msg_queue_send_from_isr(os_msg_queue_t *q, const void *item);
 
 #endif /* IPC_H */

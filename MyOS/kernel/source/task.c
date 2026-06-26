@@ -2,7 +2,7 @@
 
 #include "kernel.h"
 #include "heap.h"   // Gọi os_malloc, os_free
-#include "uart.h"   // Gọi uart_print
+#include "os_log.h"
 #include "task.h"
 #include "kernel_config.h"
 #include "low_power.h"
@@ -79,6 +79,7 @@ void task_init(void)
         TCB_t *t = &tcb_table[tid];
         t->stack_ptr = NULL;
         t->tid = tid;
+        t->name = "unused";
         t->entry = NULL;
         t->state = TASK_UNUSED;
         list_node_init(&t->node);
@@ -88,8 +89,6 @@ void task_init(void)
         t->mem.stack_alloc_base = 0;
         t->mem.stack_base = 0;
         t->mem.stack_size = 0;
-        t->mem.heap_base = 0;
-        t->mem.heap_size = 0;
         task_clear_mpu(t);
         t->time.wakeup_tick = 0;
         t->wait_list = NULL;
@@ -127,22 +126,22 @@ os_status_t task_create_dynamic(void (*func)(void),
     }
 
     if (func == NULL) {
-        uart_print("Error: Task entry is NULL.\r\n");
+        os_log_write("Error: Task entry is NULL.\r\n");
         return OS_ERROR;
     }
 
     if (priority >= MAX_PRIORITY) {
-        uart_print("Error: Invalid task priority.\r\n");
+        os_log_write("Error: Invalid task priority.\r\n");
         return OS_ERROR;
     }
 
     if (stack_words < OS_MIN_STACK_WORDS) {
-        uart_print("Error: Task stack too small.\r\n");
+        os_log_write("Error: Task stack too small.\r\n");
         return OS_ERROR;
     }
 
     if (stack_words > (UINT32_MAX / sizeof(uint32_t))) {
-        uart_print("Error: Task stack too large.\r\n");
+        os_log_write("Error: Task stack too large.\r\n");
         return OS_ERROR;
     }
 
@@ -159,13 +158,13 @@ os_status_t task_create_dynamic(void (*func)(void),
     }
 
     if (tid == TASK_INVALID_TID) {
-        uart_print("Error: No free task slot.\r\n");
+        os_log_write("Error: No free task slot.\r\n");
         return OS_ERROR;
     }
 
     if (tcb_table[tid].state != TASK_UNUSED &&
         tcb_table[tid].state != TASK_TERMINATED) {
-        uart_print("Error: Task slot is already in use.\r\n");
+        os_log_write("Error: Task slot is already in use.\r\n");
         return OS_ERROR;
     }
 
@@ -173,13 +172,13 @@ os_status_t task_create_dynamic(void (*func)(void),
     stack_size_bytes = task_round_stack_size(requested_stack_bytes);
     if (stack_size_bytes == 0U ||
         stack_size_bytes > (UINT32_MAX / 2U)) {
-        uart_print("Error: Task stack too large.\r\n");
+        os_log_write("Error: Task stack too large.\r\n");
         return OS_ERROR;
     }
 
     raw_mem = os_malloc((size_t)stack_size_bytes * 2U);
     if (raw_mem == NULL) {
-        uart_print("Error: OS Heap Full. Cannot create task.\r\n");
+        os_log_write("Error: OS Heap Full. Cannot create task.\r\n");
         return OS_ERROR;
     }
 
@@ -212,27 +211,27 @@ os_status_t task_create_static(void (*func)(void),
     }
 
     if (func == NULL) {
-        uart_print("Error: Task entry is NULL.\r\n");
+        os_log_write("Error: Task entry is NULL.\r\n");
         return OS_ERROR;
     }
 
     if (priority >= MAX_PRIORITY) {
-        uart_print("Error: Invalid task priority.\r\n");
+        os_log_write("Error: Invalid task priority.\r\n");
         return OS_ERROR;
     }
 
     if (stack_buffer == NULL) {
-        uart_print("Error: Static task stack is NULL.\r\n");
+        os_log_write("Error: Static task stack is NULL.\r\n");
         return OS_ERROR;
     }
 
     if (stack_words < OS_MIN_STACK_WORDS) {
-        uart_print("Error: Task stack too small.\r\n");
+        os_log_write("Error: Task stack too small.\r\n");
         return OS_ERROR;
     }
 
     if (stack_words > (UINT32_MAX / sizeof(uint32_t))) {
-        uart_print("Error: Task stack too large.\r\n");
+        os_log_write("Error: Task stack too large.\r\n");
         return OS_ERROR;
     }
 
@@ -249,26 +248,26 @@ os_status_t task_create_static(void (*func)(void),
     }
 
     if (tid == TASK_INVALID_TID) {
-        uart_print("Error: No free task slot.\r\n");
+        os_log_write("Error: No free task slot.\r\n");
         return OS_ERROR;
     }
 
     if (tcb_table[tid].state != TASK_UNUSED &&
         tcb_table[tid].state != TASK_TERMINATED) {
-        uart_print("Error: Task slot is already in use.\r\n");
+        os_log_write("Error: Task slot is already in use.\r\n");
         return OS_ERROR;
     }
 
     stack_size_bytes = task_round_stack_size(stack_words * sizeof(uint32_t));
     if (stack_size_bytes == 0U ||
         stack_size_bytes != (stack_words * sizeof(uint32_t))) {
-        uart_print("Error: Static task stack size must be power-of-two.\r\n");
+        os_log_write("Error: Static task stack size must be power-of-two.\r\n");
         return OS_ERROR;
     }
 
     stack_base = (uint32_t)stack_buffer;
     if ((stack_base & (stack_size_bytes - 1U)) != 0U) {
-        uart_print("Error: Static task stack is not MPU-aligned.\r\n");
+        os_log_write("Error: Static task stack is not MPU-aligned.\r\n");
         return OS_ERROR;
     }
 
@@ -327,6 +326,7 @@ static os_status_t task_setup(void (*func)(void),
 
     t->stack_ptr = sp;
     t->tid = tid;
+    t->name = func == prvIdleTask ? "idle" : "task";
     t->entry = func;
     t->sched.priority = priority;
     t->sched.base_priority = priority;
@@ -335,8 +335,6 @@ static os_status_t task_setup(void (*func)(void),
 
     list_node_init(&t->node);
 
-    t->mem.heap_base = 0;
-    t->mem.heap_size = 0;
     t->time.wakeup_tick = 0;
     t->wait_list = NULL;
     t->wait_result = OS_OK;
@@ -543,6 +541,14 @@ os_status_t task_clear_mpu_extra(uint32_t tid)
     return task_set_mpu_extra(tid, &disabled);
 }
 
+void task_set_name(uint32_t tid, const char *name)
+{
+    if (tid < MAX_TASKS && name != NULL &&
+        tcb_table[tid].state != TASK_UNUSED) {
+        tcb_table[tid].name = name;
+    }
+}
+
 
 void task_yield(void)
 {
@@ -730,11 +736,11 @@ __attribute__((weak))
 void vApplicationStackOverflowHook(TCB_t *task)
 {
     if (task != NULL) {
-        uart_print("Stack overflow in task ");
-        uart_print_dec(task->tid);
-        uart_print("\r\n");
+        os_log_write("Stack overflow in task ");
+        os_log_write_dec(task->tid);
+        os_log_write("\r\n");
     } else {
-        uart_print("Stack overflow in unknown task\r\n");
+        os_log_write("Stack overflow in unknown task\r\n");
     }
 }
 
@@ -767,6 +773,7 @@ os_status_t os_task_get_info(uint32_t tid, os_task_info_t *info)
     }
 
     info->tid = task->tid;
+    info->name = task->name;
     info->state = task->state;
     info->priority = task->sched.priority;
     info->stack_size = task->mem.stack_size;
@@ -853,9 +860,9 @@ void prvIdleTask(void)
 #ifdef MYOS_DIAG_DEMO
         if (diag_demo_printed == 0U && os_tick_count >= 2000U) {
             diag_demo_printed = 1U;
-            uart_print("\r\n[DIAG_DEMO] stats\r\n");
+            os_log_write("\r\n[DIAG_DEMO] stats\r\n");
             runtime_stats_print();
-            uart_print("\r\n[DIAG_DEMO] trace\r\n");
+            os_log_write("\r\n[DIAG_DEMO] trace\r\n");
             os_trace_dump(24U);
         }
 #endif

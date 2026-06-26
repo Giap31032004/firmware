@@ -12,26 +12,30 @@ typedef struct {
     list_t wait_list;
 } os_sem_t;
 
-void sem_init(os_sem_t *sem, int32_t initial_count);
-os_status_t sem_init_counting(os_sem_t *sem,
-                              int32_t initial_count,
-                              int32_t max_count);
-void binary_sem_init(os_sem_t *sem, int initially_available);
-void sem_wait(os_sem_t *sem);
+os_status_t sem_init(os_sem_t *sem,
+                     int32_t initial_count,
+                     int32_t max_count);
 os_status_t sem_wait_timeout(os_sem_t *sem, uint32_t timeout_ticks);
 void sem_signal(os_sem_t *sem);
 void sem_signal_from_isr(os_sem_t *sem);
 int32_t sem_get_count(os_sem_t *sem);
 
+#define binary_sem_init(sem, available) \
+    ((void)sem_init((sem), (available) ? 1 : 0, 1))
+
+#define sem_wait(sem) \
+    ((void)sem_wait_timeout((sem), OS_WAIT_FOREVER))
+
 typedef struct {
-    int locked;
     TCB_t *owner;
     list_t wait_list;
 } os_mutex_t;
 
 void mutex_init(os_mutex_t *mtx);
-void mutex_lock(os_mutex_t *mtx);
 os_status_t mutex_lock_timeout(os_mutex_t *mtx, uint32_t timeout_ticks);
 void mutex_unlock(os_mutex_t *mtx);
+
+#define mutex_lock(mtx) \
+    ((void)mutex_lock_timeout((mtx), OS_WAIT_FOREVER))
 
 #endif /* SYNC_H */

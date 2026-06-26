@@ -43,8 +43,13 @@ CFLAGS  = \
     -std=c99 \
     $(INCLUDES)
 
+DEPFLAGS = -MMD -MP
+
 ifneq ($(MYOS_TEST_SCENARIO),)
 CFLAGS += -DMYOS_TEST_SCENARIO=$(MYOS_TEST_SCENARIO)
+endif
+ifneq ($(MYOS_BENCH_USE_DWT),)
+CFLAGS += -DMYOS_BENCH_USE_DWT=$(MYOS_BENCH_USE_DWT)
 endif
 ifneq ($(MYOS_DIAG_DEMO),)
 CFLAGS += -DMYOS_DIAG_DEMO=$(MYOS_DIAG_DEMO)
@@ -71,6 +76,9 @@ C_OBJS = $(patsubst %.c, $(BUILD_DIR)/%.o, $(C_SRCS))
 ASM_OBJS = $(patsubst %.s, $(BUILD_DIR)/%.o, $(ASM_SRCS))
 
 OBJS = $(C_OBJS) $(ASM_OBJS)
+DEPS = $(C_OBJS:.o=.d)
+
+-include $(DEPS)
 
 # ====================================================================
 # 4. BUILD RULES (QUY TẮC BIÊN DỊCH)
@@ -94,7 +102,7 @@ $(BUILD_DIR)/$(TARGET).elf: $(OBJS)
 $(BUILD_DIR)/%.o: %.c
 	@mkdir -p $(dir $@)
 	@echo "  CC        $<"
-	@$(CC) $(CFLAGS) -c $< -o $@
+	@$(CC) $(CFLAGS) $(DEPFLAGS) -c $< -o $@
 
 # Biên dịch file .s (Assembly) thành .o
 $(BUILD_DIR)/%.o: %.s

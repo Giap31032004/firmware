@@ -17,6 +17,7 @@ Usage: bash scripts/run-rtos-tests.sh [options] [test ...]
 Tests:
   delay-timeout sem-timeout suspend-delay kill-wait round-robin mutex-pi
   heap-fragmentation stack-overflow queue-timeout isr-semaphore software-timer
+  api-latency context-switch timer-jitter cpu-load
 
 Options:
   -b, --backend NAME      renode or qemu. Default: renode
@@ -74,6 +75,10 @@ if [[ ${#tests[@]} -eq 0 ]]; then
         queue-timeout
         isr-semaphore
         software-timer
+        api-latency
+        context-switch
+        timer-jitter
+        cpu-load
     )
 fi
 
@@ -90,6 +95,10 @@ scenario_for_test() {
         queue-timeout) printf '10\n' ;;
         isr-semaphore) printf '12\n' ;;
         software-timer) printf '17\n' ;;
+        api-latency) printf '18\n' ;;
+        context-switch) printf '19\n' ;;
+        timer-jitter) printf '20\n' ;;
+        cpu-load) printf '21\n' ;;
         *)
             echo "Unknown RTOS test '$1'" >&2
             exit 64
@@ -110,6 +119,10 @@ match_for_test() {
         queue-timeout) printf 'queue_timeout PASS\n' ;;
         isr-semaphore) printf 'isr_semaphore PASS\n' ;;
         software-timer) printf 'software_timer PASS\n' ;;
+        api-latency) printf 'api_latency PASS\n' ;;
+        context-switch) printf 'context_switch_latency PASS\n' ;;
+        timer-jitter) printf 'timer_jitter PASS\n' ;;
+        cpu-load) printf 'cpu_load PASS\n' ;;
         *)
             echo "Unknown RTOS test '$1'" >&2
             exit 64

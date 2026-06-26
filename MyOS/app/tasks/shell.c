@@ -28,11 +28,16 @@ static void shell_print_help(void)
     uart_print("  stats       : Show per-task CPU usage\r\n");
     uart_print("  trace       : Dump recent RTOS trace events\r\n");
     uart_print("  traceclear  : Clear RTOS trace buffer\r\n");
+    uart_print("  monitor on  : Periodically print system summary\r\n");
+    uart_print("  monitor off : Stop periodic monitor output\r\n");
+    uart_print("  monitor once: Print runtime and trace once\r\n");
+    uart_print("  monitor status: Show monitor state\r\n");
     uart_print("  thermal     : Print thermal snapshot\r\n");
     uart_print("  heap        : Show heap usage\r\n");
     uart_print("  queue       : Show temperature queue\r\n");
     uart_print("  power       : Show tickless idle status\r\n");
     uart_print("  demo        : Show demo flow\r\n");
+    uart_print("  demo features: Show live MyOS feature status\r\n");
     uart_print("  stacks      : Check task stack canaries\r\n");
     uart_print("  kill <id>   : Kill a task\r\n");
     uart_print("  stop <id>   : Suspend a task\r\n");
@@ -67,6 +72,18 @@ void task_shell(void)
             } else if (my_strcmp(cmd_buffer, "traceclear") == 0) {
                 os_trace_clear();
                 uart_print("[TRACE] cleared\r\n");
+            } else if (my_strcmp(cmd_buffer, "monitor on") == 0) {
+                app_monitor_set_enabled(1);
+                uart_print("[MONITOR] enabled, period=2000 ticks\r\n");
+            } else if (my_strcmp(cmd_buffer, "monitor off") == 0) {
+                app_monitor_set_enabled(0);
+                uart_print("[MONITOR] disabled\r\n");
+            } else if (my_strcmp(cmd_buffer, "monitor once") == 0) {
+                app_monitor_print_once();
+            } else if (my_strcmp(cmd_buffer, "monitor status") == 0) {
+                uart_print(app_monitor_is_enabled()
+                               ? "[MONITOR] enabled\r\n"
+                               : "[MONITOR] disabled\r\n");
             } else if (my_strcmp(cmd_buffer, "thermal") == 0 ||
                        my_strcmp(cmd_buffer, "status") == 0) {
                 app_print_system_status();
@@ -79,6 +96,8 @@ void task_shell(void)
                 app_print_power_status();
             } else if (my_strcmp(cmd_buffer, "demo") == 0) {
                 app_print_demo_summary();
+            } else if (my_strcmp(cmd_buffer, "demo features") == 0) {
+                app_print_feature_demo();
             } else if (my_strcmp(cmd_buffer, "stacks") == 0) {
                 task_check_all_stacks();
                 app_print_line("[STACK] All active task canaries are intact.");

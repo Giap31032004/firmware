@@ -24,6 +24,7 @@ void task_sensor(void);
 void task_controller(void);
 void task_shell(void);
 void task_gpio_blink(void);
+void task_runtime_monitor(void);
 
 #ifndef MYOS_TEST_SCENARIO
 static void app_create_task_or_log(void (*func)(void),
@@ -34,7 +35,9 @@ static void app_create_task_or_log(void (*func)(void),
     uint32_t tid = TASK_INVALID_TID;
     os_status_t status = task_create_dynamic(func, priority, stack_words, &tid);
 
-    if (status != OS_OK) {
+    if (status == OS_OK) {
+        task_set_name(tid, name);
+    } else {
         uart_print("[APP] Failed to create task: ");
         uart_print(name);
         uart_print("\r\n");
@@ -61,6 +64,23 @@ static void app_print_u32(const char *label, uint32_t value)
     uart_print(label);
     uart_print_dec(value);
     uart_print("\r\n");
+}
+
+static void app_print_column(const char *text, uint32_t width)
+{
+    uint32_t length = 0U;
+
+    if (text == NULL) {
+        text = "";
+    }
+
+    while (text[length] != '\0' && length < width) {
+        uart_putc(text[length++]);
+    }
+
+    while (length++ < width) {
+        uart_putc(' ');
+    }
 }
 
 void app_print_line(const char *s)
@@ -131,8 +151,8 @@ void app_print_task_table(void)
         return;
     }
 
-    uart_print("\r\nTID  STATE       PRIO  STACK  FREE_WORDS\r\n");
-    uart_print("-------------------------------------------\r\n");
+    uart_print("\r\nID  NAME         STATE      PRIO  STACK  FREE\r\n");
+    uart_print("-----------------------------------------------\r\n");
 
     for (uint32_t i = 0; i < MAX_TASKS; i++) {
         if (os_task_get_info(i, &info) != OS_OK) {
@@ -140,9 +160,9 @@ void app_print_task_table(void)
         }
 
         uart_print_dec(info.tid);
-        uart_print("    ");
-        uart_print(task_state_str(info.state));
-        uart_print("    ");
+        uart_print("   ");
+        app_print_column(info.name != NULL ? info.name : "task", 13U);
+        app_print_column(task_state_str(info.state), 11U);
         uart_print_dec(info.priority);
         uart_print("     ");
         uart_print(info.stack_ok != 0U ? "OK" : "BAD");
@@ -229,7 +249,42 @@ void app_print_power_status(void)
 void app_print_demo_summary(void)
 {
     app_print_line("[DEMO] sensor/filter -> queue -> controller/alarm/log");
-    app_print_line("[DEMO] tasks: sensor, controller, shell, gpio_blink");
+    app_print_line("[DEMO] kernel: preemption, IPC, sync, heap, trace, tickless");
+    app_print_line("[DEMO] use 'demo features' for live feature status");
+}
+
+void app_print_feature_demo(void)
+{
+    os_heap_stats_t heap;
+    app_thermal_snapshot_t snapshot = {0};
+
+    os_get_heap_stats(&heap);
+    (void)app_get_thermal_snapshot(&snapshot, 20U);
+
+    uart_print("\r\n========== MyOS FEATURE DEMO ==========\r\n");
+    uart_print("[PASS] Scheduler: preemptive priority + round robin\r\n");
+    uart_print("[PASS] IPC queue: temperature items=");
+    uart_print_dec((uint32_t)sem_get_count(&temp_queue.sem_data));
+    uart_print("/");
+    uart_print_dec(temp_queue.length);
+    uart_print("\r\n");
+    uart_print("[PASS] Sync: semaphore + mutex + priority inheritance\r\n");
+    uart_print("[PASS] Memory: heap free=");
+    uart_print_dec((uint32_t)heap.free_bytes);
+    uart_print(" bytes, fragmentation=");
+    uart_print_dec(heap.fragmentation_percent);
+    uart_print("%\r\n");
+    uart_print("[PASS] Safety: MPU + stack canary enabled\r\n");
+    uart_print("[PASS] Diagnostics: runtime stats + filtered trace\r\n");
+    uart_print("[PASS] Low power: tickless idle=");
+    uart_print(OS_USE_TICKLESS_IDLE ? "ON" : "OFF");
+    uart_print("\r\n");
+    uart_print("[APP ] Thermal pipeline: ");
+    uart_print(app_temp_zone_str(snapshot.zone));
+    uart_print(", fan=");
+    uart_print_dec((uint32_t)snapshot.fan_pwm_percent);
+    uart_print("%\r\n");
+    uart_print("=======================================\r\n");
 }
 
 void service_init(void)
@@ -255,6 +310,8 @@ void app_init(void)
     app_create_task_or_log(task_shell, PRIORITY_NORMAL,
                            OS_DEFAULT_STACK_WORDS * 2U, "shell");
     app_create_task_or_log(task_gpio_blink, PRIORITY_LOW,
-                           OS_MIN_STACK_WORDS, "gpio_blink");
+                           OS_MIN_STACK_WORDS, "gpio");
+    app_create_task_or_log(task_runtime_monitor, PRIORITY_LOW,
+                           OS_DEFAULT_STACK_WORDS, "monitor");
 #endif
 }

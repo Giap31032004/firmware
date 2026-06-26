@@ -7,8 +7,11 @@
 
 #define APP_TEMP_WARN_THRESHOLD      40
 #define APP_TEMP_CRITICAL_THRESHOLD  50
-#define APP_TEMP_SAMPLE_PERIOD       25U
-#define APP_LOG_PERIOD_TICKS         200U
+#define APP_TEMP_SAMPLE_PERIOD       100U
+#define APP_LOG_PERIOD_TICKS         1000U
+#define APP_MONITOR_PERIOD_TICKS     2000U
+#define APP_MONITOR_DEFAULT_ENABLED  1
+#define APP_MONITOR_PRINT_STATS      1
 
 typedef enum {
     TEMP_ZONE_NORMAL = 0,
@@ -44,6 +47,10 @@ void app_print_queue_status(void);
 void app_print_heap_status(void);
 void app_print_power_status(void);
 void app_print_demo_summary(void);
+void app_print_feature_demo(void);
+void app_monitor_set_enabled(int enabled);
+int app_monitor_is_enabled(void);
+void app_monitor_print_once(void);
 const char *app_temp_zone_str(temp_zone_t zone);
 
 #endif

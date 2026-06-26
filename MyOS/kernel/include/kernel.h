@@ -3,10 +3,11 @@
 
 #include <stdint.h>
 #include "critical.h"
+#include "os_log.h"
 
 #define OS_ENTER_CRITICAL() uint32_t __os_irq_state = os_enter_critical()
 #define OS_EXIT_CRITICAL() os_exit_critical(__os_irq_state)
-#define KERNEL_LOG(msg) uart_print(msg)
+#define KERNEL_LOG(msg) os_log_write(msg)
 #define OS_WAIT_FOREVER UINT32_MAX
 
 typedef enum {
@@ -29,8 +30,6 @@ typedef enum {
 void kernel_init(void);
 void os_delay(uint32_t ticks);
 void kernel_panic(const char *reason, const char *file, int line);
-
-void uart_print(const char *s);
 
 #include "tick.h"
 #include "timer.h"

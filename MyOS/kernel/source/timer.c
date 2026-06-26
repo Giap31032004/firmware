@@ -43,6 +43,8 @@ void timer_process_tick(void)
         os_timer_t *timer;
         os_timer_callback_t callback;
         void *arg;
+        uint8_t auto_reload;
+        uint32_t period_ticks;
         uint32_t irq_state = os_enter_critical();
 
         if (list_is_empty(&active_timer_list)) {
@@ -57,9 +59,18 @@ void timer_process_tick(void)
         }
 
         list_remove(&active_timer_list, &timer->node);
-        timer->active = 0U;
         callback = timer->callback;
         arg = timer->arg;
+        auto_reload = timer->auto_reload;
+        period_ticks = timer->period_ticks;
+
+        if (auto_reload != 0U && period_ticks != 0U) {
+            timer->expiry_tick += period_ticks;
+            timer->active = 1U;
+            software_timer_insert_locked(timer);
+        } else {
+            timer->active = 0U;
+        }
 
         os_exit_critical(irq_state);
 
@@ -106,7 +117,9 @@ void os_timer_init(os_timer_t *timer,
     timer->callback = callback;
     timer->arg = arg;
     timer->expiry_tick = 0U;
+    timer->period_ticks = 0U;
     timer->active = 0U;
+    timer->auto_reload = 0U;
 }
 
 os_status_t os_timer_start(os_timer_t *timer,
@@ -128,6 +141,36 @@ os_status_t os_timer_start(os_timer_t *timer,
     }
 
     timer->expiry_tick = os_tick_count + delay_ticks;
+    timer->period_ticks = 0U;
+    timer->auto_reload = 0U;
+    timer->active = 1U;
+    software_timer_insert_locked(timer);
+
+    os_exit_critical(irq_state);
+    return OS_OK;
+}
+
+os_status_t os_timer_start_periodic(os_timer_t *timer,
+                                    uint32_t period_ticks)
+{
+    uint32_t irq_state;
+
+    if (timer == NULL ||
+        timer->callback == NULL ||
+        period_ticks == 0U) {
+        return OS_ERROR;
+    }
+
+    irq_state = os_enter_critical();
+
+    if (timer->active != 0U) {
+        list_remove(&active_timer_list, &timer->node);
+        timer->active = 0U;
+    }
+
+    timer->expiry_tick = os_tick_count + period_ticks;
+    timer->period_ticks = period_ticks;
+    timer->auto_reload = 1U;
     timer->active = 1U;
     software_timer_insert_locked(timer);
 
@@ -149,6 +192,9 @@ void os_timer_stop(os_timer_t *timer)
         list_remove(&active_timer_list, &timer->node);
         timer->active = 0U;
     }
+
+    timer->auto_reload = 0U;
+    timer->period_ticks = 0U;
 
     os_exit_critical(irq_state);
 }

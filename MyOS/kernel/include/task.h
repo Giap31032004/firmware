@@ -24,6 +24,7 @@ typedef enum {
 
 typedef struct {
     uint32_t tid;
+    const char *name;
     task_state_t state;
     uint8_t priority;
     uint32_t stack_size;
@@ -39,6 +40,7 @@ typedef struct TCB {
 
     /* task identity */
     uint32_t tid;
+    const char *name;
     void (*entry)(void);
     task_state_t state;
 
@@ -100,6 +102,7 @@ void task_suspend(uint32_t tid);
 void task_resume(uint32_t tid);
 os_status_t task_set_mpu_extra(uint32_t tid, const mpu_region_t *region);
 os_status_t task_clear_mpu_extra(uint32_t tid);
+void task_set_name(uint32_t tid, const char *name);
 
 #define os_task_kill(tid)       task_kill((tid))
 #define os_task_suspend(tid)    task_suspend((tid))
