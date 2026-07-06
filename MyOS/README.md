@@ -174,26 +174,6 @@ timer jitter
 CPU load
 ```
 
-## Cấu Trúc Driver/HAL
-
-GPIO và UART được tách theo hướng:
-
-```text
-app
-  -> hal
-     -> drivers
-        -> thanh ghi STM32/CMSIS
-```
-
-Ví dụ UART:
-
-```text
-hal/hal_uart.c
-drivers/driver_uart.c
-```
-
-`hal_uart` cung cấp API như `uart_print`, `uart_getc`, `uart_putc`. `driver_uart` cấu hình USART1, GPIOA PA9/PA10 và interrupt RX.
-
 ## File Quan Trọng
 
 ```text
@@ -204,19 +184,4 @@ platform/system_stm32f4xx.c      SystemInit và SystemCoreClock
 RenodeOfMe/stm32.resc            Script chạy mô phỏng Renode
 ```
 
-## Trước Khi Nộp Project
 
-Nên kiểm tra lại bằng các lệnh:
-
-```bash
-make clean
-make
-make run-renode
-```
-
-Không cần nộp các thư mục output:
-
-```text
-build/
-logs/
-```
