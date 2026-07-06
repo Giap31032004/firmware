@@ -2,7 +2,7 @@
 #define BOARD_H
 
 #include <stdint.h>
-#include "memory_map.h"
+#include "stm32f407xx.h"
 
 /* =========================================================
    Board Support Package (BSP)
