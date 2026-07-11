@@ -10,7 +10,7 @@
  *   mpu_disable_extra() — clear slot 7 when task has no extra region
  *
  * Call sequence:
- *   Boot:           mpu_init()
+ *   Board init:     mpu_init()
  *   Context switch: mpu_switch_task(&next_task->mpu)
  */
 
@@ -20,10 +20,10 @@
  * BOOT — program static regions and enable MPU
  *
  * Programs slots 0–5 from static_regions[] table.
- * Enables MPU with PRIVDEFENA = 0 (no default map fallback —
- * privileged code faults on unmapped access, safer for an OS).
+ * Enables MPU with PRIVDEFENA controlled by
+ * MPU_ENABLE_PRIVILEGED_DEFAULT in kernel_config.h.
  *
- * Call once from Reset_Handler before main(), after SystemInit().
+ * Call once from board_init(), before kernel_init().
  * ========================================================= */
 void mpu_init(void);
 

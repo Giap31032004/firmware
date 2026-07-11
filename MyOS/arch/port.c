@@ -63,6 +63,24 @@ int port_tick_start_periodic(void)
     return systick_init(SYSTICK_RATE_HZ);
 }
 
+uint32_t port_runtime_counter(void)
+{
+    uint32_t tick = os_tick_count;
+    uint32_t load = SysTick->LOAD + 1U;
+    uint32_t val = SysTick->VAL;
+    uint32_t elapsed_in_tick = 0U;
+    const uint32_t cycles_per_tick = CPU_CLOCK_HZ / SYSTICK_RATE_HZ;
+
+    if (load > 1U && val <= load) {
+        elapsed_in_tick = load - val;
+        if (elapsed_in_tick > cycles_per_tick) {
+            elapsed_in_tick = cycles_per_tick;
+        }
+    }
+
+    return (tick * cycles_per_tick) + elapsed_in_tick;
+}
+
 void port_tick_stop(void)
 {
     systick_disable();

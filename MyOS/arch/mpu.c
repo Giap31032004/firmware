@@ -1,25 +1,8 @@
 #include "mpu.h"
 #include "kernel_config.h"
+#include "stm32f407xx.h"
+#include "mpu_armv7.h"
 #include <stddef.h>
-
-#define MPU_BASE_ADDR           0xE000ED90UL
-#define SCB_SHCSR               (*(volatile uint32_t *)0xE000ED24UL)
-#define SCB_SHCSR_MEMFAULTENA   (1U << 16)
-
-typedef struct {
-    volatile uint32_t TYPE;
-    volatile uint32_t CTRL;
-    volatile uint32_t RNR;
-    volatile uint32_t RBAR;
-    volatile uint32_t RASR;
-} MPU_Type;
-
-#define MPU                     ((MPU_Type *)MPU_BASE_ADDR)
-
-#define MPU_CTRL_ENABLE         (1U << 0)
-#define MPU_CTRL_HFNMIENA       (1U << 1)
-#define MPU_CTRL_PRIVDEFENA     (1U << 2)
-#define MPU_RBAR_VALID          (1U << 4)
 
 #ifndef MPU_ENABLE_PRIVILEGED_DEFAULT
 #define MPU_ENABLE_PRIVILEGED_DEFAULT 1
@@ -114,7 +97,7 @@ static void mpu_write_region(uint8_t slot, const mpu_region_t *region, uint32_t 
         base = region->base;
     }
 
-    MPU->RBAR = (base & ~0x1FUL) | MPU_RBAR_VALID | (uint32_t)slot;
+    MPU->RBAR = ARM_MPU_RBAR(slot, base);
 
     if (enable != 0U && mpu_region_is_valid(region)) {
         uint32_t size = mpu_encode_size(region->size_bytes);
@@ -134,8 +117,8 @@ void mpu_init(void)
 
     MPU->CTRL = 0U;
 
-    __asm volatile ("dsb" ::: "memory");
-    __asm volatile ("isb" ::: "memory");
+    __DSB();
+    __ISB();
 
     for (uint8_t i = 0U; i < MPU_STATIC_REGION_COUNT; i++) {
         mpu_write_region(i, &static_regions[i], 1U);
@@ -145,16 +128,16 @@ void mpu_init(void)
     MPU->RASR = MPU_REGION_DISABLE;
     mpu_disable_extra();
 
-    SCB_SHCSR |= SCB_SHCSR_MEMFAULTENA;
+    SCB->SHCSR |= SCB_SHCSR_MEMFAULTENA_Msk;
 
-    MPU->CTRL = MPU_CTRL_ENABLE | MPU_CTRL_HFNMIENA
+    MPU->CTRL = MPU_CTRL_ENABLE_Msk | MPU_CTRL_HFNMIENA_Msk
 #if MPU_ENABLE_PRIVILEGED_DEFAULT
-              | MPU_CTRL_PRIVDEFENA
+              | MPU_CTRL_PRIVDEFENA_Msk
 #endif
               ;
 
-    __asm volatile ("dsb" ::: "memory");
-    __asm volatile ("isb" ::: "memory");
+    __DSB();
+    __ISB();
 
     initialized = 1U;
 }
@@ -173,12 +156,12 @@ void mpu_switch_task(const task_mpu_t *task_mpu)
         mpu_disable_extra();
     }
 
-    __asm volatile ("dsb" ::: "memory");
-    __asm volatile ("isb" ::: "memory");
+    __DSB();
+    __ISB();
 }
 
 void mpu_disable_extra(void)
 {
-    MPU->RBAR = MPU_RBAR_VALID | MPU_SLOT_TASK_EXTRA;
+    MPU->RBAR = ARM_MPU_RBAR(MPU_SLOT_TASK_EXTRA, 0U);
     MPU->RASR = MPU_REGION_DISABLE;
 }

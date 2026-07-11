@@ -24,6 +24,23 @@
 #include <stdint.h>
 
 /* =========================================================
+ * LINKER-PROVIDED MEMORY BOUNDARIES
+ *
+ * Defined in platform/linker_for_stm32f407.ld. Use the address
+ * of each symbol, for example: (uintptr_t)&_kernel_flash_start.
+ * ========================================================= */
+extern uint8_t _kernel_flash_start;
+extern uint8_t _kernel_flash_end;
+extern uint8_t _user_flash_start;
+extern uint8_t _user_flash_end;
+extern uint8_t _kernel_ram_start;
+extern uint8_t _kernel_ram_end;
+extern uint8_t _user_ram_start;
+extern uint8_t _user_ram_end;
+extern uint8_t _ccmram_start;
+extern uint8_t _ccmram_end;
+
+/* =========================================================
  * REGION SLOT INDICES
  * ========================================================= */
 #define MPU_SLOT_KERNEL_FLASH    0U
@@ -159,12 +176,9 @@ typedef struct
 } task_mpu_t;
 
 /* =========================================================
- * STATIC REGION TABLE  (defined in memory_layout.c)
+ * STATIC REGION TABLE  (defined in arch/mpu.c)
  * Indexed by MPU_SLOT_* constants 0–5.
  * ========================================================= */
 extern const mpu_region_t static_regions[MPU_STATIC_REGION_COUNT];
-
-/* Convenience alias — total static region count */
-#define system_region_count  MPU_STATIC_REGION_COUNT
 
 #endif /* MEMORY_LAYOUT_H */

@@ -1,10 +1,10 @@
 #include "uart.h"
 #include "kernel.h"
-#include "task.h"       
-#include "sync.h" 
+#include "task.h"
+#include "sync.h"
 #include "ipc.h"
 #include <stdint.h>
-#include <stddef.h>   
+#include <stddef.h>
 #include "app_global.h"
 #include "board.h"
 
@@ -15,47 +15,46 @@
 int main(void)
 {
     /*------------------------------------------
-      1. Board peripherals
+      1. Board and low-level hardware init
     ------------------------------------------*/
     board_init();
-    // uart
-    // gpio
-    // driver-level IRQ enable nếu có
-
+    // MPU static regions
+    // UART
+    // GPIO/LED
 
     /*------------------------------------------
       2. Kernel init
     ------------------------------------------*/
     kernel_init();
-    // ready queue
-    // scheduler state
+    // runtime statistics and trace buffer
+    // scheduler ready queues
+    // task table, tick, timer, heap
     // idle task
 
     /*------------------------------------------
-      3. Optional services
+      3. Application services
     ------------------------------------------*/
     service_init();
-    // mutex
-    // sem
-    // ipc
-
+    // temperature message queue
+    // application mutex
 
     /*------------------------------------------
       4. Create user tasks
     ------------------------------------------*/
     app_init();
-    // task_create(...)
-    // lúc này mới có thể setup
-    // per-task MPU regions nếu dùng
-
+    // task_create_dynamic(...)
+    // per-task stack and MPU settings
 
     /*------------------------------------------
       5. Start RTOS
     ------------------------------------------*/
     os_start();
-    // SysTick init
-    // PendSV priority
-    // __enable_irq()
-    // first task
-    while(1);
+    // select first ready task
+    // load first task MPU settings
+    // set PendSV/SysTick/SVC priorities
+    // start SysTick
+    // SVC enters the first task
+
+    while (1) {
+    }
 }

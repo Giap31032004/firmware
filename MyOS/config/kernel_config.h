@@ -39,10 +39,6 @@
 #define OS_MIN_STACK_WORDS      64
 #define OS_DEFAULT_STACK_WORDS  256
 
-/* Single source of truth */
-#define STACK_SIZE              OS_DEFAULT_STACK_WORDS
-
-
 /* =========================================================
  *                  SAFETY / DEBUG
  * ========================================================= */

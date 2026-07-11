@@ -1,9 +1,6 @@
 /* STM32F407 MPU-AWARE MEMORY MAP */
 ENTRY(Reset_Handler)
 
-_Min_Heap_Size  = 0x200;
-_Min_Stack_Size = 0x400;
-
 /* ================= MEMORY SPLIT ================= */
 MEMORY
 {
@@ -16,7 +13,7 @@ MEMORY
   /* KERNEL RAM (RTOS core data) */
   KERNEL_RAM   (xrw) : ORIGIN = 0x20000000, LENGTH = 32K
 
-  /* USER RAM (tasks data/heap) */
+  /* USER RAM (explicit .user_data/.user_bss sections) */
   USER_RAM     (xrw) : ORIGIN = 0x20008000, LENGTH = 80K
 
   /* CCM RAM (fast kernel stack / critical buffers) */
@@ -25,6 +22,18 @@ MEMORY
 
 /* Kernel stack at top of kernel RAM */
 PROVIDE(_estack = ORIGIN(KERNEL_RAM) + LENGTH(KERNEL_RAM));
+
+/* Memory-region boundaries exported for MPU setup and diagnostics */
+PROVIDE(_kernel_flash_start = ORIGIN(KERNEL_FLASH));
+PROVIDE(_kernel_flash_end   = ORIGIN(KERNEL_FLASH) + LENGTH(KERNEL_FLASH));
+PROVIDE(_user_flash_start   = ORIGIN(USER_FLASH));
+PROVIDE(_user_flash_end     = ORIGIN(USER_FLASH) + LENGTH(USER_FLASH));
+PROVIDE(_kernel_ram_start   = ORIGIN(KERNEL_RAM));
+PROVIDE(_kernel_ram_end     = ORIGIN(KERNEL_RAM) + LENGTH(KERNEL_RAM));
+PROVIDE(_user_ram_start     = ORIGIN(USER_RAM));
+PROVIDE(_user_ram_end       = ORIGIN(USER_RAM) + LENGTH(USER_RAM));
+PROVIDE(_ccmram_start       = ORIGIN(CCMRAM));
+PROVIDE(_ccmram_end         = ORIGIN(CCMRAM) + LENGTH(CCMRAM));
 
 SECTIONS
 {
@@ -150,20 +159,8 @@ SECTIONS
     _euserbss = .;
   } >USER_RAM
 
-  /* _end for newlib sbrk — placed right after kernel BSS, before heap */
+  /* Kernel heap allocator starts at _end and grows toward _estack - 4K. */
   PROVIDE(_end = _ebss);
-
-  /* ================= HEAP + STACK (KERNEL ONLY) ================= */
-  .kernel_heap_stack :
-  {
-    . = ALIGN(8);
-    _heap_start = .;
-    . = . + _Min_Heap_Size;
-    _heap_end   = .;
-    _stack_end  = .;        /* lowest valid stack address (grows downward) */
-    . = . + _Min_Stack_Size;
-    . = ALIGN(8);
-  } >KERNEL_RAM
 
   /* ================= OVERFLOW GUARDS ================= */
   ASSERT(ORIGIN(KERNEL_RAM) + LENGTH(KERNEL_RAM) >= _estack,

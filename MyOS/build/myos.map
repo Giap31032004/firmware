@@ -52,16 +52,29 @@ LOAD build/platform/startup.o
                 0x00000200                        _Min_Heap_Size = 0x200
                 0x00000400                        _Min_Stack_Size = 0x400
                 0x20008000                        PROVIDE (_estack = (ORIGIN (KERNEL_RAM) + LENGTH (KERNEL_RAM)))
+                [!provide]                        PROVIDE (__kernel_flash_start = ORIGIN (KERNEL_FLASH))
+                [!provide]                        PROVIDE (__kernel_flash_end = (ORIGIN (KERNEL_FLASH) + LENGTH (KERNEL_FLASH)))
+                [!provide]                        PROVIDE (__user_flash_start = ORIGIN (USER_FLASH))
+                [!provide]                        PROVIDE (__user_flash_end = (ORIGIN (USER_FLASH) + LENGTH (USER_FLASH)))
+                [!provide]                        PROVIDE (__kernel_ram_start = ORIGIN (KERNEL_RAM))
+                [!provide]                        PROVIDE (__kernel_ram_end = (ORIGIN (KERNEL_RAM) + LENGTH (KERNEL_RAM)))
+                [!provide]                        PROVIDE (__user_ram_start = ORIGIN (USER_RAM))
+                [!provide]                        PROVIDE (__user_ram_end = (ORIGIN (USER_RAM) + LENGTH (USER_RAM)))
+                [!provide]                        PROVIDE (__ccmram_start = ORIGIN (CCMRAM))
+                [!provide]                        PROVIDE (__ccmram_end = (ORIGIN (CCMRAM) + LENGTH (CCMRAM)))
 
 .isr_vector     0x08000000      0x188
                 0x08000000                        . = ALIGN (0x4)
+                0x08000000                        __isr_vector_start = .
  *(.isr_vector)
  .isr_vector    0x08000000      0x188 build/platform/startup.o
                 0x08000000                _isr_vector
                 0x08000188                        . = ALIGN (0x4)
+                0x08000188                        __isr_vector_end = .
 
 .kernel_text    0x08000188       0xbc
                 0x08000188                        . = ALIGN (0x4)
+                0x08000188                        __kernel_text_start = .
  *(.kernel_text .kernel_text*)
  .kernel_text   0x08000188       0xb8 build/platform/startup.o
                 0x08000188                Reset_Handler
@@ -157,6 +170,7 @@ LOAD build/platform/startup.o
                 0x08000240                OTG_HS_EP1_IN_Handler
  *(.kernel_rodata .kernel_rodata*)
                 0x08000244                        . = ALIGN (0x4)
+                0x08000244                        __kernel_text_end = .
 
 .ARM.extab
  *(.ARM.extab* .gnu.linkonce.armextab.*)
@@ -185,6 +199,7 @@ LOAD build/platform/startup.o
 
 .user_text      0x08010000     0x4f78
                 0x08010000                        . = ALIGN (0x4)
+                0x08010000                        __user_text_start = .
  *(.user_text .user_text*)
  *(.text .text*)
  .text          0x08010000      0x86c build/app/app_global.o
@@ -446,6 +461,7 @@ LOAD build/platform/startup.o
                 0x08014f60                AHBPrescTable
                 0x08014f70                APBPrescTable
                 0x080153fc                        . = ALIGN (0x4)
+                0x08014f78                        __user_text_end = .
                 0x08000244                        _sidata = LOADADDR (.kernel_data)
                 0x08014f78                        _siuserdata = LOADADDR (.user_data)
                 0x0800027c                        _siccmram = LOADADDR (.ccmram)
@@ -473,6 +489,7 @@ LOAD build/platform/startup.o
 
 .kernel_data    0x20000000       0x38 load address 0x08000244
                 0x20000000                        . = ALIGN (0x4)
+                0x20000000                        __kernel_data_start = .
                 0x20000000                        _sdata = .
  *(.kernel_data .kernel_data*)
  *(.data .data*)
@@ -516,13 +533,16 @@ LOAD build/platform/startup.o
  .data          0x20000038        0x0 build/platform/startup.o
                 0x20000038                        . = ALIGN (0x4)
                 0x20000038                        _edata = .
+                0x20000038                        __kernel_data_end = .
 
 .user_data      0x20008000        0x0 load address 0x08014f78
                 0x20008000                        . = ALIGN (0x4)
+                0x20008000                        __user_data_start = .
                 0x20008000                        _suserdata = .
  *(.user_data .user_data*)
                 0x20008000                        . = ALIGN (0x4)
                 0x20008000                        _euserdata = .
+                0x20008000                        __user_data_end = .
 
 .ccmram         0x10000000        0x0 load address 0x0800027c
                 0x10000000                        . = ALIGN (0x4)
@@ -533,6 +553,7 @@ LOAD build/platform/startup.o
 
 .kernel_bss     0x20000038      0x9e4
                 0x20000038                        . = ALIGN (0x4)
+                0x20000038                        __kernel_bss_start = .
                 0x20000038                        _sbss = .
  *(.kernel_bss .kernel_bss*)
  *(.bss .bss*)
@@ -585,13 +606,16 @@ LOAD build/platform/startup.o
                 0x20000a1c                        . = ALIGN (0x4)
  *fill*         0x20000a19        0x3 
                 0x20000a1c                        _ebss = .
+                0x20000a1c                        __kernel_bss_end = .
 
 .user_bss       0x20008000        0x0
                 0x20008000                        . = ALIGN (0x4)
+                0x20008000                        __user_bss_start = .
                 0x20008000                        _suserbss = .
  *(.user_bss .user_bss*)
                 0x20008000                        . = ALIGN (0x4)
                 0x20008000                        _euserbss = .
+                0x20008000                        __user_bss_end = .
                 0x20000a1c                        PROVIDE (_end = _ebss)
 
 .kernel_heap_stack

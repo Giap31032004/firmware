@@ -73,8 +73,6 @@ typedef struct TCB {
 /* ================= GLOBAL TASK TABLE ================= */
 
 #define TASK_INVALID_TID UINT32_MAX
-#define OS_TASK_STACK_ALIGNED(stack_words) \
-    __attribute__((aligned((stack_words) * sizeof(uint32_t))))
 
 extern TCB_t tcb_table[MAX_TASKS];
 

@@ -4,8 +4,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define HEAP_SIZE (32 * 1024)
-
 typedef struct {
     uint32_t stack_alloc_base;
     uint32_t stack_base;

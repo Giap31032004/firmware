@@ -3,9 +3,6 @@
 
 #include <stdint.h>
 
-#define SYSTEM_CLOCK_HZ 16000000U
-#define UART_BAUDRATE   115200U
-
 void uart_init(void);
 void uart_putc(char c);
 char uart_getc(void);

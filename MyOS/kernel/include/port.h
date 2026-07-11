@@ -31,5 +31,6 @@ void port_tick_stop(void);
 void port_tick_clear_pending(void);
 uint32_t port_tick_start_oneshot(uint32_t ticks);
 uint32_t port_tick_elapsed(uint32_t programmed_ticks);
+uint32_t port_runtime_counter(void);
 
 #endif /* PORT_H */

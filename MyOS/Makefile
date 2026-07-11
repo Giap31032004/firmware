@@ -125,29 +125,32 @@ run: all
 	@qemu-system-arm $(QEMU_FLAGS)
 
 run-trace: all
-	@echo "  QEMU      Trace Mode (trace_instr.log)"
-	@qemu-system-arm $(QEMU_FLAGS) -d in_asm -D trace_instr.log
+	@mkdir -p logs/run-trace
+	@echo "  QEMU      Trace Mode (logs/run-trace/trace_instr.log)"
+	@qemu-system-arm $(QEMU_FLAGS) -d in_asm -D logs/run-trace/trace_instr.log
 
 run-debug: all
-	@echo "  QEMU      CPU/IRQ Debug Mode (trace_cpu_irq.log)"
-	@qemu-system-arm $(QEMU_FLAGS) -d cpu,int -D trace_cpu_irq.log
+	@mkdir -p logs/run-debug
+	@echo "  QEMU      CPU/IRQ Debug Mode (logs/run-debug/trace_cpu_irq.log)"
+	@qemu-system-arm $(QEMU_FLAGS) -d cpu,int -D logs/run-debug/trace_cpu_irq.log
 
 run-gdb: all
 	@echo "  QEMU      Waiting for GDB connection on port 1234..."
 	@qemu-system-arm $(QEMU_FLAGS) -S -gdb tcp::1234
 
 gdb:
-	$(PREFIX)gdb $(BUILD_DIR)/$(TARGET).elf -ex "target remote localhost:1234"
+	gdb-multiarch $(BUILD_DIR)/$(TARGET).elf -ex "target remote localhost:1234"
 
 run-renode:
 	$(RENODE) --console --disable-xwt RenodeOfMe/stm32.resc
 
 run-renode-capture:
-	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/capture-renode-log.ps1
+	@mkdir -p logs/run-renode-capture
+	bash scripts/run-renode-capture.sh --log-dir logs/run-renode-capture
 
 debug-renode:
 	gdb-multiarch $(BUILD_DIR)/$(TARGET).elf -ex "target remote :3333"
 
 clean:
 	@echo "  CLEAN     $(BUILD_DIR) and log files"
-	@rm -rf $(BUILD_DIR) *.log
+	@rm -rf $(BUILD_DIR) *.log logs/run-trace/*.log logs/run-debug/*.log logs/run-renode-capture/*.log

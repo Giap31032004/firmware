@@ -3,9 +3,6 @@
 
 #include <stdint.h>
 
-#define UART_DRIVER_CLOCK_HZ 16000000U
-#define UART_DRIVER_BAUDRATE 115200U
-
 void uart_driver_init(void);
 void uart_driver_putc_raw(char c);
 void uart_driver_rx_callback_from_isr(char c);

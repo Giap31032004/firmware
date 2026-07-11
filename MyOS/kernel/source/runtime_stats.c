@@ -1,17 +1,12 @@
 #include <stdint.h>
 
 #include "critical.h"
-#include "hardware_config.h"
 #include "kernel_config.h"
 #include "os_log.h"
+#include "port.h"
 #include "runtime_stats.h"
 #include "scheduler.h"
 #include "utils.h"
-
-#define SYSTICK_BASE    0xE000E010UL
-#define SYSTICK_LOAD    (*(volatile uint32_t *)(SYSTICK_BASE + 0x04UL))
-#define SYSTICK_VAL     (*(volatile uint32_t *)(SYSTICK_BASE + 0x08UL))
-#define SYSTICK_CYCLES_PER_TICK (CPU_CLOCK_HZ / SYSTICK_RATE_HZ)
 
 static uint32_t runtime_stats_started;
 
@@ -62,19 +57,7 @@ void runtime_stats_init(void)
 
 uint32_t runtime_stats_counter(void)
 {
-    uint32_t tick = os_tick_count;
-    uint32_t load = SYSTICK_LOAD + 1U;
-    uint32_t val = SYSTICK_VAL;
-    uint32_t elapsed_in_tick = 0U;
-
-    if (load > 1U && val <= load) {
-        elapsed_in_tick = load - val;
-        if (elapsed_in_tick > SYSTICK_CYCLES_PER_TICK) {
-            elapsed_in_tick = SYSTICK_CYCLES_PER_TICK;
-        }
-    }
-
-    return (tick * SYSTICK_CYCLES_PER_TICK) + elapsed_in_tick;
+    return port_runtime_counter();
 }
 
 void runtime_stats_task_switched_in(TCB_t *task)
